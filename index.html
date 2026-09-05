@@ -1,0 +1,2903 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🐾 Xaiu猫猫守护团</title>
+<style>
+:root{
+  --orange:#FF8C42;
+  --orange-deep:#E9731F;
+  --orange-soft:#FFE7D1;
+  --beige:#FBF1E5;
+  --cream:#FFF9F0;
+  --paper:#FFFDF8;
+  --text:#4A3728;
+  --muted:#9A816D;
+  --line:#EAD9C5;
+  --red:#E5484D;
+  --red-soft:#FFE8E4;
+  --green:#1E9E6A;
+  --green-soft:#E2F6EC;
+  --shadow:0 6px 18px rgba(192,129,75,.13);
+  --radius:16px;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",sans-serif;
+  background:linear-gradient(180deg,#FBEEDF 0%,#FFF8F0 420px) fixed;
+  color:var(--text);
+  min-height:100vh;
+}
+button{font-family:inherit;}
+.hidden{display:none!important;}
+
+/* ---------- 顶部 ---------- */
+.app-header{
+  background:linear-gradient(135deg,#FF8C42 0%,#FFA75E 55%,#FFB77C 100%);
+  color:#fff;
+  box-shadow:0 4px 18px rgba(216,122,55,.28);
+}
+.header-inner{
+  max-width:1120px;
+  margin:0 auto;
+  padding:18px 20px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
+  flex-wrap:wrap;
+}
+.brand h1{
+  margin:0;
+  font-size:26px;
+  letter-spacing:.5px;
+}
+.brand small{
+  display:block;
+  margin-top:2px;
+  font-size:12px;
+  opacity:.92;
+}
+.admin-zone{
+  display:flex;
+  align-items:center;
+  gap:14px;
+  flex-wrap:wrap;
+}
+.btn-light{
+  background:rgba(255,255,255,.18);
+  color:#fff;
+  border:1px solid rgba(255,255,255,.65);
+  border-radius:999px;
+  padding:8px 14px;
+  font-size:13px;
+  cursor:pointer;
+  transition:.2s;
+}
+.btn-light:hover{background:rgba(255,255,255,.3);}
+.switch-wrap{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  font-size:14px;
+  font-weight:600;
+  cursor:pointer;
+  user-select:none;
+}
+.switch{position:relative;display:inline-block;width:52px;height:29px;flex:0 0 auto;}
+.switch input{opacity:0;width:0;height:0;}
+.slider{
+  position:absolute;
+  inset:0;
+  background:rgba(255,255,255,.45);
+  border-radius:999px;
+  transition:.25s;
+}
+.slider:before{
+  content:"";
+  position:absolute;
+  left:3px;
+  top:3px;
+  width:23px;
+  height:23px;
+  border-radius:50%;
+  background:#fff;
+  box-shadow:0 2px 5px rgba(0,0,0,.2);
+  transition:.25s;
+}
+.switch input:checked + .slider{background:#5F3A1E;}
+.switch input:checked + .slider:before{transform:translateX(23px);}
+
+/* ---------- 主体通用 ---------- */
+.container{max-width:1120px;margin:0 auto;padding:22px 16px 12px;}
+.card{
+  background:var(--paper);
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  box-shadow:var(--shadow);
+  padding:18px 20px;
+  margin-top:16px;
+}
+.card h2{
+  margin:0 0 4px;
+  font-size:18px;
+}
+.card-sub{
+  margin:0 0 12px;
+  font-size:13px;
+  color:var(--muted);
+}
+
+/* 统计卡片 */
+.stats-grid{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:14px;
+}
+.stat-card{
+  background:var(--paper);
+  border:1px solid var(--line);
+  border-top:4px solid var(--orange);
+  border-radius:var(--radius);
+  box-shadow:var(--shadow);
+  padding:15px 16px;
+  transition:background .25s,border-color .25s;
+}
+.stat-label{font-size:13px;color:var(--muted);margin-bottom:7px;}
+.stat-value{
+  font-size:23px;
+  font-weight:800;
+  letter-spacing:.3px;
+  word-break:break-all;
+}
+.stat-icon{font-size:22px;float:right;}
+.card-warn{
+  background:#FFF1DE!important;
+  border-color:#FFB46B!important;
+}
+.card-danger{
+  background:var(--red-soft)!important;
+  border-color:#FF948D!important;
+}
+
+/* 预算 */
+.budget-card{padding:18px 20px 16px;}
+.budget-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  flex-wrap:wrap;
+}
+.budget-input-group{
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.budget-input-group label{font-size:13px;color:var(--muted);white-space:nowrap;}
+#budgetInput{width:110px;text-align:right;}
+.budget-stats{
+  display:flex;
+  gap:18px;
+  flex-wrap:wrap;
+  font-size:14px;
+  color:#6F5642;
+  margin:13px 0 8px;
+}
+.budget-stats b{font-size:16px;}
+.budget-stats .over{color:var(--red);}
+.budget-percent{
+  margin-left:auto;
+  font-weight:700;
+  color:var(--orange-deep);
+}
+.progress{
+  height:13px;
+  background:#F2E2CE;
+  border-radius:999px;
+  overflow:hidden;
+}
+.progress-bar{
+  height:100%;
+  width:0%;
+  border-radius:999px;
+  background:linear-gradient(90deg,#FFC38B,#FF8C42);
+  transition:width .45s ease,background .3s;
+}
+.budget-card.warn .progress-bar{background:linear-gradient(90deg,#FFC38B,#FF8C42);}
+.budget-card.danger .progress-bar{background:linear-gradient(90deg,#FF9B8E,#E5484D);}
+.budget-card.warn{background:#FFF5E8;}
+.budget-card.danger{background:#FFF0EC;}
+.budget-tip{margin:10px 0 0;font-size:13px;min-height:20px;}
+.budget-card.warn .budget-tip{color:#C25E14;font-weight:600;}
+.budget-card.danger .budget-tip{color:#C62B30;font-weight:700;}
+
+/* 猫咪档案统计 + 月底预测 */
+.panels-grid{
+  display:grid;
+  grid-template-columns:1fr 1.2fr;
+  gap:16px;
+  align-items:stretch;
+}
+.panels-grid .card{margin-top:0;}
+.cat-stat-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin:12px 0 14px;
+}
+.cat-stat-item{
+  background:#FFF4E7;
+  border:1px solid #F0C79F;
+  border-radius:12px;
+  padding:10px 12px;
+  text-align:center;
+}
+.cat-stat-item b{display:block;font-size:22px;color:var(--orange-deep);}
+.cat-stat-item span{font-size:12px;color:#8A6B51;}
+.cats-toolbar{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:10px;
+  flex-wrap:wrap;
+}
+.cats-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(250px,1fr));
+  gap:16px;
+  margin-top:14px;
+}
+.cat-card{
+  background:#FFFDF8;
+  border:1px solid var(--line);
+  border-radius:16px;
+  overflow:hidden;
+  box-shadow:var(--shadow);
+}
+.cat-cover{
+  height:170px;
+  background:linear-gradient(135deg,#FFE7D1,#FFF4E7);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:52px;
+}
+.cat-cover img{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+}
+.cat-body{padding:12px 14px 14px;}
+.cat-name-row{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:8px;
+}
+.cat-name-row h3{margin:0;font-size:18px;}
+.cat-chips{margin:8px 0;display:flex;flex-wrap:wrap;gap:6px;}
+.cat-chip{
+  font-size:11px;
+  border-radius:999px;
+  padding:3px 9px;
+  background:#F6EBDD;
+  color:#7E6550;
+}
+.cat-chip.adopted{background:#FFE7D1;color:#A84F12;}
+.cat-chip.vaccinated{background:#E2F6EC;color:#147A51;}
+.cat-note{
+  font-size:12px;
+  color:#8A6B51;
+  margin:6px 0 0;
+  line-height:1.55;
+  white-space:pre-wrap;
+}
+.cat-album{margin-top:10px;}
+.cat-album-label{
+  font-size:11px;
+  color:#A0866E;
+  margin-bottom:6px;
+}
+.cat-album-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(72px,1fr));
+  gap:6px;
+}
+.cat-album-grid img{
+  width:100%;
+  height:72px;
+  object-fit:cover;
+  border-radius:8px;
+  cursor:pointer;
+  border:1px solid #F0E0CC;
+}
+.cat-card-actions{
+  display:flex;
+  justify-content:flex-end;
+  gap:8px;
+  margin-top:10px;
+}
+.admin-account-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  padding:10px 2px;
+  border-bottom:1px dashed #F0E0CC;
+}
+.admin-account-row .current{
+  color:var(--green);
+  font-size:12px;
+}
+.admin-account-form{
+  display:flex;
+  gap:8px;
+  margin-top:14px;
+  flex-wrap:wrap;
+}
+.admin-account-form input{
+  flex:1;
+  min-width:150px;
+}
+.cat-editor-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr 1fr;
+  gap:10px 14px;
+}
+.cat-photo-boxes{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(76px,1fr));
+  gap:8px;
+  margin:6px 0 10px;
+}
+.cat-photo-box{
+  position:relative;
+  height:76px;
+  border-radius:9px;
+  overflow:hidden;
+  border:1px solid #F0E0CC;
+  background:#FFF4E7;
+}
+.cat-photo-box img{width:100%;height:100%;object-fit:cover;display:block;}
+.cat-photo-del{
+  position:absolute;
+  top:3px;
+  right:3px;
+  width:20px;
+  height:20px;
+  line-height:18px;
+  text-align:center;
+  background:rgba(0,0,0,.55);
+  color:#fff;
+  border-radius:50%;
+  cursor:pointer;
+  font-size:12px;
+}
+.cat-add-photo{
+  border:2px dashed #E6C8A5;
+  color:var(--orange-deep);
+  border-radius:10px;
+  height:76px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+  font-size:13px;
+  background:#FFF9F0;
+}
+.cat-editor-title{
+  font-weight:700;
+  font-size:13px;
+  color:#6F5642;
+  margin:12px 0 2px;
+}
+.cat-editor-hint{font-size:12px;color:#B79E86;}
+.deworm-card{
+  background:#FBF1E5;
+  border:1px solid #F0DFCB;
+  border-radius:12px;
+  padding:12px;
+  margin-top:10px;
+}
+.deworm-fields{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px 12px;
+}
+.deworm-card label{
+  font-size:12px;
+  color:#6F5642;
+  display:block;
+}
+.deworm-med{margin-top:8px;}
+.deworm-med input{width:100%;}
+.deworm-card .dw-del{margin-top:8px;width:100%;}
+.forecast-body{display:flex;flex-direction:column;gap:7px;font-size:14px;}
+.forecast-row{
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  padding:7px 2px;
+  border-bottom:1px dashed #F0DFCB;
+}
+.forecast-row span{color:#7E6550;}
+.forecast-row b{font-variant-numeric:tabular-nums;}
+.forecast-result{
+  display:flex;
+  justify-content:space-between;
+  border-radius:11px;
+  padding:9px 12px;
+  font-weight:700;
+  background:#EFF7F1;
+  color:#17764F;
+}
+.forecast-result.danger{
+  background:var(--red-soft);
+  color:#C22C31;
+}
+.forecast-msg{
+  margin:8px 0 0;
+  font-size:13px;
+  line-height:1.55;
+  border-radius:10px;
+  padding:8px 11px;
+}
+.forecast-msg.ok{background:#E5F5EC;color:#17764F;}
+.forecast-msg.warn{background:#FFE9DC;color:#BE5A11;font-weight:600;}
+.forecast-msg.danger{background:#FFE3E0;color:#B72E33;font-weight:700;}
+
+/* 表单 */
+.form-grid{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:12px 14px;
+}
+.field label{
+  display:block;
+  font-size:13px;
+  color:#6F5642;
+  margin-bottom:5px;
+  font-weight:600;
+}
+input[type="text"],input[type="number"],input[type="date"],input[type="password"],select,textarea{
+  width:100%;
+  padding:9px 11px;
+  border:1px solid #E6D2BA;
+  border-radius:10px;
+  background:#fff;
+  color:var(--text);
+  font-size:14px;
+  outline:none;
+  transition:.2s;
+}
+input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 0 0 3px rgba(255,140,66,.16);}
+input[type="checkbox"]{accent-color:var(--orange);width:16px;height:16px;cursor:pointer;}
+.span-2{grid-column:span 2;}
+.amount-preview{
+  margin:10px 0 0;
+  font-size:13px;
+  color:#8A6B51;
+}
+.amount-preview b{color:var(--orange-deep);}
+.form-error{
+  margin:10px 0 0;
+  color:var(--red);
+  font-size:13px;
+  min-height:18px;
+}
+.form-actions{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  flex-wrap:wrap;
+  margin-top:10px;
+}
+
+/* 按钮 */
+.btn{
+  border:none;
+  border-radius:12px;
+  padding:10px 17px;
+  font-size:14px;
+  font-weight:600;
+  cursor:pointer;
+  transition:.18s;
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  justify-content:center;
+}
+.btn:active{transform:scale(.97);}
+.btn:disabled{opacity:.45;cursor:not-allowed;transform:none;}
+.btn.primary{background:var(--orange);color:#fff;box-shadow:0 4px 12px rgba(255,140,66,.35);}
+.btn.primary:hover{background:var(--orange-deep);}
+.btn.secondary{background:var(--orange-soft);color:#A84F12;}
+.btn.secondary:hover{background:#FFDDBF;}
+.btn.ghost{background:#fff;border:1px solid #E2CDB4;color:#5B3F2B;}
+.btn.ghost:hover{background:#FFF3E6;border-color:#D6B898;}
+.btn.danger{background:var(--red-soft);color:#C12A30;}
+.btn.danger:hover{background:#FCD5D2;}
+.btn.small{padding:7px 13px;font-size:13px;border-radius:10px;}
+
+/* 记录列表 */
+.records-card{padding-bottom:14px;}
+.card-header-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  flex-wrap:wrap;
+}
+.record-count{
+  font-size:13px;
+  color:var(--muted);
+  background:#F6EBDD;
+  border-radius:999px;
+  padding:4px 11px;
+}
+.toolbar{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-wrap:wrap;
+  margin:12px 0 4px;
+}
+.toolbar-btns{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  margin-left:auto;
+}
+.select-all-label{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  font-size:13px;
+  color:#6F5642;
+  cursor:pointer;
+  padding:6px 10px;
+  border-radius:9px;
+  background:#FBF1E5;
+}
+.table-wrap{
+  overflow-x:auto;
+  margin-top:10px;
+  border:1px solid #F0E1CF;
+  border-radius:12px;
+  background:#fff;
+}
+table{
+  width:100%;
+  border-collapse:collapse;
+  min-width:680px;
+  font-size:14px;
+}
+th{
+  text-align:left;
+  background:#FFF3E6;
+  color:#6F5642;
+  font-size:13px;
+  font-weight:700;
+  padding:10px 12px;
+  white-space:nowrap;
+}
+td{
+  padding:10px 12px;
+  border-top:1px solid #F4E8D8;
+  vertical-align:middle;
+}
+tbody tr{transition:background .15s;}
+tbody tr:hover{background:#FFF8F0;}
+tr.selected-row{background:#FFEFDD!important;}
+.date-cell{white-space:nowrap;color:#6F5642;}
+.note-cell{
+  max-width:270px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  color:#8A6B51;
+}
+.type-badge{
+  display:inline-block;
+  border-radius:999px;
+  padding:3px 10px;
+  font-size:12px;
+  font-weight:700;
+}
+.type-badge.income{background:var(--green-soft);color:#147A51;}
+.type-badge.expense{background:#FCE2E0;color:#CE3338;}
+.amount-cell{
+  font-weight:800;
+  font-variant-numeric:tabular-nums;
+  white-space:nowrap;
+  text-align:right;
+}
+.amount-cell.income{color:var(--green);}
+.amount-cell.expense{color:var(--red);}
+.action-cell{width:62px;text-align:center;}
+.icon-btn{
+  border:none;
+  background:transparent;
+  font-size:17px;
+  cursor:pointer;
+  padding:5px 8px;
+  border-radius:9px;
+  opacity:.62;
+  transition:.15s;
+}
+.icon-btn:hover{opacity:1;background:#FCE8E4;}
+.empty-tip{
+  text-align:center;
+  color:var(--muted);
+  font-size:14px;
+  padding:26px 12px;
+}
+.empty-tip span{font-size:30px;display:block;margin-bottom:8px;}
+
+/* 图表 */
+.charts-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:16px;
+}
+.charts-grid .card{margin-top:0;}
+.chart-card h2{font-size:17px;}
+.chart-wrap{
+  position:relative;
+  height:280px;
+}
+#pieChart,#lineChart{max-width:100%;}
+.chart-empty{
+  position:absolute;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color:var(--muted);
+  font-size:14px;
+  text-align:center;
+  padding:0 15px;
+}
+
+/* 底部 */
+.bottom-area{
+  display:flex;
+  justify-content:center;
+  margin:24px 0 6px;
+}
+footer{
+  text-align:center;
+  color:#A78F7A;
+  font-size:13px;
+  padding:8px 16px 26px;
+}
+
+/* ---------- 弹窗 ---------- */
+.modal-overlay{
+  position:fixed;
+  inset:0;
+  background:rgba(58,37,18,.52);
+  backdrop-filter:blur(2px);
+  display:none;
+  align-items:flex-start;
+  justify-content:center;
+  overflow-y:auto;
+  padding:34px 16px;
+  z-index:1200;
+}
+.modal-overlay.open{display:flex;}
+.modal{
+  background:#FFFDF9;
+  width:100%;
+  max-width:480px;
+  border-radius:20px;
+  padding:22px 22px 18px;
+  box-shadow:0 20px 55px rgba(45,25,8,.3);
+  animation:pop .2s ease;
+  margin:auto 0;
+}
+.modal-wide{max-width:780px;}
+@keyframes pop{
+  from{opacity:0;transform:translateY(10px) scale(.98);}
+  to{opacity:1;transform:none;}
+}
+.modal h3{margin:0 0 4px;font-size:19px;}
+.modal-sub{margin:0 0 15px;font-size:13px;color:var(--muted);}
+.modal .field{margin-bottom:12px;}
+.modal-actions{
+  display:flex;
+  justify-content:flex-end;
+  gap:10px;
+  margin-top:16px;
+  flex-wrap:wrap;
+}
+.modal-error{
+  color:var(--red);
+  font-size:13px;
+  min-height:18px;
+  margin:0 0 4px;
+}
+.modal-note{
+  margin:10px 0 0;
+  font-size:12px;
+  color:var(--muted);
+}
+
+/* 回收站 */
+.recycle-action{
+  display:flex;
+  gap:6px;
+  justify-content:flex-end;
+}
+
+/* 报销单 */
+.receipt-modal{max-width:680px;background:#fff;}
+.receipt-paper{padding:8px 4px 4px;}
+.receipt-title{
+  font-size:21px;
+  margin:0 0 2px;
+  text-align:center;
+}
+.receipt-meta{
+  display:flex;
+  justify-content:space-between;
+  color:#8A6B51;
+  font-size:12px;
+  border-bottom:2px solid var(--orange);
+  padding-bottom:9px;
+  margin-bottom:10px;
+  flex-wrap:wrap;
+  gap:6px;
+}
+.receipt-modal table{min-width:0;}
+.receipt-modal th{background:#FFF1E1;}
+.receipt-total{
+  text-align:right;
+  font-size:16px;
+  margin:13px 2px 0;
+  font-weight:700;
+}
+.receipt-total b{color:var(--orange-deep);font-size:20px;}
+
+/* 提示 */
+.toast{
+  position:fixed;
+  left:50%;
+  bottom:26px;
+  transform:translate(-50%,16px);
+  background:rgba(66,42,22,.95);
+  color:#fff;
+  padding:10px 20px;
+  border-radius:999px;
+  font-size:14px;
+  box-shadow:0 8px 25px rgba(0,0,0,.25);
+  opacity:0;
+  pointer-events:none;
+  transition:.25s;
+  z-index:2000;
+  max-width:90vw;
+}
+.toast.show{opacity:1;transform:translate(-50%,0);}
+
+/* 分享二维码 */
+.share-modal{max-width:430px;text-align:center;}
+.share-qr{
+  background:#fff;
+  border:1rpx solid transparent;
+  border:1px solid #F0E0CC;
+  border-radius:14px;
+  padding:12px;
+  display:inline-block;
+  margin:4px auto 8px;
+}
+.share-qr img{display:block;width:210px;height:210px;max-width:100%;}
+.share-hint{color:var(--muted);font-size:12px;min-height:18px;margin:4px 0 12px;}
+.share-url-row{display:flex;gap:8px;}
+.share-url-row input{flex:1;min-width:0;}
+
+/* 打印：只打印报销单 */
+@media print{
+  body *{visibility:hidden!important;}
+  #receiptOverlay,#receiptOverlay *{visibility:visible!important;}
+  #receiptOverlay{
+    position:absolute;
+    inset:0;
+    display:flex;
+    background:#fff;
+    padding:0;
+    align-items:flex-start;
+    overflow:visible;
+  }
+  #receiptOverlay .modal{
+    max-width:100%;
+    width:100%;
+    box-shadow:none;
+    border-radius:0;
+    margin:0;
+  }
+  .no-print{display:none!important;}
+}
+
+@media (max-width:900px){
+  .stats-grid{grid-template-columns:repeat(2,1fr);}
+  .panels-grid,.charts-grid{grid-template-columns:1fr;}
+  .form-grid{grid-template-columns:1fr 1fr;}
+}
+@media (max-width:560px){
+  .stats-grid{grid-template-columns:1fr 1fr;gap:10px;}
+  .stat-value{font-size:19px;}
+  .form-grid{grid-template-columns:1fr;}
+  .span-2{grid-column:span 1;}
+  .container{padding-left:10px;padding-right:10px;}
+  .header-inner{padding:14px 14px;}
+  .brand h1{font-size:21px;}
+  .modal{padding:17px;}
+}
+</style>
+</head>
+<body>
+
+<div id="toast" class="toast"></div>
+
+<header class="app-header">
+  <div class="header-inner">
+    <div class="brand">
+      <h1>🐾 Xaiu猫猫守护团</h1>
+      <small>用心记下每一笔，喂饱每一只猫</small>
+    </div>
+    <div class="admin-zone">
+      <button id="shareBtn" class="btn-light" type="button">📱 分享 / 二维码</button>
+      <button id="changePwdBtn" class="btn-light admin-only hidden" type="button">🔑 修改密码</button>
+      <button id="adminAccountsBtn" class="btn-light admin-only hidden" type="button">👥 管理员账号</button>
+      <label class="switch-wrap" for="adminSwitch">
+        <span id="adminModeText">管理员模式</span>
+        <span class="switch">
+          <input type="checkbox" id="adminSwitch">
+          <span class="slider"></span>
+        </span>
+      </label>
+    </div>
+  </div>
+</header>
+
+<main class="container">
+
+  <!-- 统计卡片 -->
+  <section class="stats-grid" aria-label="统计看板">
+    <div class="stat-card">
+      <span class="stat-icon">💰</span>
+      <div class="stat-label">总收入</div>
+      <div class="stat-value" id="totalIncome">¥0.00</div>
+    </div>
+    <div class="stat-card">
+      <span class="stat-icon">🛒</span>
+      <div class="stat-label">总支出</div>
+      <div class="stat-value" id="totalExpense">¥0.00</div>
+    </div>
+    <div class="stat-card">
+      <span class="stat-icon">⚖️</span>
+      <div class="stat-label">当前结余</div>
+      <div class="stat-value" id="totalBalance">¥0.00</div>
+    </div>
+    <div class="stat-card" id="monthExpenseCard">
+      <span class="stat-icon">📅</span>
+      <div class="stat-label">本月总开支</div>
+      <div class="stat-value" id="monthExpense">¥0.00</div>
+    </div>
+  </section>
+
+  <!-- 本月预算未设置时的提示 -->
+  <section class="card hidden" id="budgetEmptyCard" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+    <div>
+      <h2 style="margin:0;">🎯 本月预算未设置</h2>
+      <p class="card-sub" style="margin:4px 0 0;">可留空不填；填写后会显示预算进度与超支预警</p>
+    </div>
+    <button type="button" class="btn secondary small admin-only hidden" id="enableBudgetBtn">设置预算</button>
+  </section>
+
+  <!-- 本月预算 -->
+  <section class="card budget-card" id="budgetPanel">
+    <div class="budget-head">
+      <h2>🎯 本月预算</h2>
+      <div class="budget-input-group">
+        <label for="budgetInput">预算（元）</label>
+        <input type="number" id="budgetInput" min="1" step="1" value="">
+        <button type="button" class="btn primary small" id="budgetSaveBtn">保存</button>
+      </div>
+    </div>
+    <div class="budget-stats">
+      <span>已用：<b id="budgetUsed">¥0.00</b></span>
+      <span>剩余：<b id="budgetRemain">¥500.00</b></span>
+      <span class="budget-percent" id="budgetPercent">0%</span>
+    </div>
+    <div class="progress" role="progressbar" aria-label="预算使用进度">
+      <div class="progress-bar" id="budgetProgress"></div>
+    </div>
+    <p class="budget-tip" id="budgetTip"></p>
+  </section>
+
+  <!-- 猫咪档案统计 + 月底预测 -->
+  <section class="panels-grid">
+    <div class="card">
+      <h2>🐱 猫咪档案</h2>
+      <p class="card-sub">记录每一只猫猫的照片、性别、疫苗、绝育与领养情况</p>
+      <div class="cat-stat-grid">
+        <div class="cat-stat-item"><b id="catTotal">0</b><span>档案总数</span></div>
+        <div class="cat-stat-item"><b id="catPending">0</b><span>待领养</span></div>
+        <div class="cat-stat-item"><b id="catAdopted">0</b><span>已领养</span></div>
+        <div class="cat-stat-item"><b id="catVaccinated">0</b><span>已打疫苗</span></div>
+      </div>
+      <div class="cat-card-actions">
+        <button type="button" class="btn ghost" id="viewCatsBtn">查看全部猫咪 ↓</button>
+        <button type="button" class="btn secondary admin-only hidden" id="manageCatBtn">＋ 添加猫咪</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>🔮 月底预测</h2>
+      <p class="card-sub">按本月日均开支估算月底总支出</p>
+      <div class="forecast-body" id="forecastBody"></div>
+    </div>
+  </section>
+
+  <!-- 记账表单（管理员） -->
+  <section class="card admin-only hidden" id="entrySection">
+    <div class="card-header-row">
+      <h2>✏️ 记一笔</h2>
+      <span class="record-count">管理员操作区</span>
+    </div>
+    <form id="ledgerForm" novalidate>
+      <div class="form-grid">
+        <div class="field">
+          <label for="recordDate">日期</label>
+          <input type="date" id="recordDate">
+        </div>
+        <div class="field">
+          <label for="typeSelect">类型</label>
+          <select id="typeSelect">
+            <option value="expense">支出</option>
+            <option value="income">收入</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="categorySelect">类别</label>
+          <select id="categorySelect">
+            <option value="猫粮">猫粮</option>
+            <option value="罐头">罐头</option>
+            <option value="绝育">绝育</option>
+            <option value="医疗">医疗</option>
+            <option value="义卖">义卖</option>
+            <option value="捐款">捐款</option>
+            <option value="捐赠">捐赠</option>
+            <option value="其他">其他</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="donorInput">捐款人/捐赠人</label>
+          <input type="text" id="donorInput" maxlength="40" placeholder="捐款/捐赠可选填；类别“捐款”必填">
+        </div>
+        <div class="field">
+          <label for="amountInput">金额（元，捐赠物资可不填）</label>
+          <input type="number" id="amountInput" min="0" step="0.01" placeholder="0.00">
+        </div>
+        <div class="field">
+          <label for="commonNoteSelect">常用备注</label>
+          <select id="commonNoteSelect">
+            <option value="">— 选择后自动填入，可修改 —</option>
+            <option value="XX宠物店猫粮">XX宠物店猫粮</option>
+            <option value="YY医院绝育">YY医院绝育</option>
+            <option value="ZZ超市罐头">ZZ超市罐头</option>
+          </select>
+        </div>
+        <div class="field span-2">
+          <label for="noteInput">备注</label>
+          <input type="text" id="noteInput" maxlength="100" placeholder="补充说明，如：买了 5 袋猫粮">
+        </div>
+      </div>
+      <p class="amount-preview" id="amountHint">支出会自动记为负数</p>
+      <p class="form-error" id="formError"></p>
+      <div class="form-actions">
+        <button type="submit" class="btn primary" id="addRecordBtn">＋ 记一笔</button>
+      </div>
+    </form>
+  </section>
+
+  <!-- 记录列表 -->
+  <section class="card records-card">
+    <div class="card-header-row">
+      <h2>📒 记账明细</h2>
+      <span class="record-count" id="recordCount">共 0 条</span>
+    </div>
+    <div class="toolbar">
+      <label class="select-all-label" for="selectAllChk">
+        <input type="checkbox" id="selectAllChk">
+        全选
+      </label>
+      <div class="toolbar-btns">
+        <button type="button" class="btn secondary" id="generateReceiptBtn" disabled>🧾 生成报销单</button>
+        <button type="button" class="btn ghost admin-only hidden" id="exportCsvBtn">📤 导出 CSV</button>
+        <button type="button" class="btn ghost admin-only hidden" id="exportJsonBtn">💾 导出 JSON</button>
+        <button type="button" class="btn ghost admin-only hidden" id="importJsonBtn">📥 导入 JSON</button>
+        <input type="file" id="importJsonInput" accept=".json,application/json" hidden>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:36px;"></th>
+            <th>日期</th>
+            <th>类型</th>
+            <th>类别</th>
+            <th>备注</th>
+            <th style="text-align:right;">金额</th>
+            <th class="admin-only hidden">操作</th>
+          </tr>
+        </thead>
+        <tbody id="recordListBody"></tbody>
+      </table>
+      <div id="recordEmpty" class="empty-tip"><span>🐈</span>还没有记录，开启管理员模式记一笔吧</div>
+    </div>
+  </section>
+
+  <!-- 猫咪档案全集 -->
+  <section class="card" id="catArchiveSection">
+    <div class="cats-toolbar">
+      <div>
+        <h2>🐈 猫咪档案全集</h2>
+        <p class="card-sub">点照片可放大；普通成员只读，管理员才能新增 / 编辑 / 删除</p>
+      </div>
+      <button type="button" class="btn secondary admin-only hidden" id="addCatBtn">＋ 添加猫咪</button>
+    </div>
+    <div id="catArchiveEmpty" class="empty-tip"><span>🐾</span>还没有猫咪档案，点击“添加猫咪”开始记录</div>
+    <div class="cats-grid" id="catsGrid"></div>
+  </section>
+
+  <!-- 数据可视化 -->
+  <section class="charts-grid">
+    <div class="card chart-card">
+      <h2>🍩 本月支出分类占比</h2>
+      <p class="card-sub">仅统计本月“支出”记录</p>
+      <div class="chart-wrap">
+        <canvas id="pieChart"></canvas>
+        <div id="pieEmpty" class="chart-empty">暂无本月支出数据</div>
+      </div>
+    </div>
+    <div class="card chart-card">
+      <h2>📈 近 12 个月支出趋势</h2>
+      <p class="card-sub">每月总支出（元）</p>
+      <div class="chart-wrap">
+        <canvas id="lineChart"></canvas>
+        <div id="lineEmpty" class="chart-empty">暂无支出数据，完成记账后自动生成趋势</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="bottom-area">
+    <button type="button" class="btn ghost admin-only hidden" id="recycleBinBtn">🗑️ 回收站（<span id="recycleCount">0</span>）</button>
+  </section>
+</main>
+
+<footer>Made with ❤️ for Xaiu猫猫守护团</footer>
+
+<!-- 手机分享 / 二维码 -->
+<div class="modal-overlay" id="shareOverlay">
+  <div class="modal share-modal">
+    <h3>📱 手机打开 / 二维码</h3>
+    <p class="modal-sub">手机扫码即可打开本页；也可点击“复制网址”发给别人</p>
+    <div class="share-qr" id="shareQrBox"></div>
+    <p class="share-hint" id="shareHint"></p>
+    <div class="share-url-row">
+      <input type="text" id="shareUrlInput" readonly>
+      <button type="button" class="btn primary small" id="copyShareUrlBtn">复制网址</button>
+    </div>
+    <p class="modal-note">提示：从本地文件打开时无法被手机扫码。请先按部署说明发布为 https 网址。</p>
+    <div class="modal-actions">
+      <button type="button" class="btn ghost" data-close="shareOverlay">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- 管理员登录弹窗 -->
+<div class="modal-overlay" id="loginOverlay">
+  <div class="modal">
+    <h3>🔐 管理员验证</h3>
+    <p class="modal-sub">验证通过后可记账、删除记录、修改密码及备份数据</p>
+    <div class="field">
+      <label for="loginName">管理员账号</label>
+      <input type="text" id="loginName" autocomplete="username" placeholder="默认：团长">
+    </div>
+    <div class="field">
+      <label for="loginPassword">管理员密码</label>
+      <input type="password" id="loginPassword" autocomplete="current-password" placeholder="请输入密码">
+    </div>
+    <p class="modal-error" id="loginError"></p>
+    <div class="modal-actions">
+      <button type="button" class="btn ghost" data-close="loginOverlay">取消</button>
+      <button type="button" class="btn primary" id="loginConfirmBtn">验证进入</button>
+    </div>
+  </div>
+</div>
+
+<!-- 修改密码弹窗 -->
+<div class="modal-overlay" id="pwdOverlay">
+  <div class="modal">
+    <h3>🔑 修改密码</h3>
+    <p class="modal-sub">新密码将保存在 localStorage，下次登录使用新密码</p>
+    <div class="field">
+      <label for="currentPwd">当前密码</label>
+      <input type="password" id="currentPwd" autocomplete="current-password" placeholder="请输入当前密码">
+    </div>
+    <div class="field">
+      <label for="newPwd">新密码</label>
+      <input type="password" id="newPwd" autocomplete="new-password" placeholder="请输入新密码">
+    </div>
+    <div class="field">
+      <label for="confirmPwd">确认新密码</label>
+      <input type="password" id="confirmPwd" autocomplete="new-password" placeholder="再次输入新密码">
+    </div>
+    <p class="modal-error" id="pwdError"></p>
+    <div class="modal-actions">
+      <button type="button" class="btn ghost" data-close="pwdOverlay">取消</button>
+      <button type="button" class="btn primary" id="pwdConfirmBtn">确认修改</button>
+    </div>
+  </div>
+</div>
+
+<!-- 管理员账号管理弹窗 -->
+<div class="modal-overlay" id="adminAccountsOverlay">
+  <div class="modal modal-wide">
+    <h3>👥 管理员账号</h3>
+    <p class="modal-sub">管理员不限一人，只有管理员列表中的账号可以修改数据</p>
+    <div id="adminAccountsList"></div>
+    <div class="admin-account-form">
+      <input type="text" id="newAdminName" placeholder="新管理员名称，如：副团长">
+      <input type="password" id="newAdminPassword" autocomplete="new-password" placeholder="初始密码（至少4位）">
+      <button type="button" class="btn primary small" id="addAdminAccountBtn">＋ 添加</button>
+    </div>
+    <p class="modal-error" id="adminAccountError"></p>
+    <div class="modal-actions">
+      <button type="button" class="btn ghost" data-close="adminAccountsOverlay">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- 修改管理员昵称弹窗 -->
+<div class="modal-overlay" id="renameOverlay">
+  <div class="modal">
+    <h3>✏️ 修改我的昵称</h3>
+    <p class="modal-sub">昵称不一定叫“团长”，修改后下次登录使用新昵称</p>
+    <div class="field">
+      <label for="renameAdminName">新昵称</label>
+      <input type="text" id="renameAdminName" maxlength="20" placeholder="例如：猫团财务长">
+    </div>
+    <p class="modal-error" id="renameAdminError"></p>
+    <div class="modal-actions">
+      <button type="button" class="btn ghost" data-close="renameOverlay">取消</button>
+      <button type="button" class="btn primary" id="renameAdminConfirmBtn">保存昵称</button>
+    </div>
+  </div>
+</div>
+
+<!-- 猫咪档案编辑弹窗 -->
+<div class="modal-overlay" id="catEditorOverlay">
+  <div class="modal modal-wide">
+    <h3 id="catEditorTitle">🐱 添加猫咪</h3>
+    <p class="modal-sub">照片支持多张、可多次添加；领养后仍可继续上传回访照片</p>
+    <div class="cat-editor-grid">
+      <div class="field">
+        <label for="catNameInput">姓名</label>
+        <input type="text" id="catNameInput" placeholder="例如：橘座">
+      </div>
+      <div class="field">
+        <label for="catGenderSelect">性别</label>
+        <select id="catGenderSelect">
+          <option value="公">公</option>
+          <option value="母">母</option>
+          <option value="未知" selected>未知</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="catVaccineSelect">疫苗情况</label>
+        <select id="catVaccineSelect">
+          <option value="未打">未打</option>
+          <option value="已打">已打</option>
+          <option value="未知" selected>未知</option>
+        </select>
+      </div>
+      <div class="field" id="catDoseField" style="display:none;">
+        <label for="catDoseSelect">已打针数</label>
+        <select id="catDoseSelect">
+          <option value="1">1针</option>
+          <option value="2">2针</option>
+          <option value="3" selected>3针</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="catNeuteredSelect">绝育情况</label>
+        <select id="catNeuteredSelect">
+          <option value="已绝育">已绝育</option>
+          <option value="未绝育">未绝育</option>
+          <option value="未知" selected>未知</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="catNoteInput">备注</label>
+        <input type="text" id="catNoteInput" placeholder="毛色、性格、救助故事等">
+      </div>
+      <label class="adopt-check" style="display:flex;align-items:center;gap:8px;font-size:14px;color:#6F5642;align-self:end;margin-bottom:22px;">
+        <input type="checkbox" id="catAdoptedChk"> 已被领养
+      </label>
+      <label class="adopt-check" style="display:flex;align-items:center;gap:8px;font-size:14px;color:#6F5642;align-self:end;margin-bottom:22px;">
+        <input type="checkbox" id="catFosteredChk"> 正在寄养
+      </label>
+    </div>
+
+    <div class="field" id="catFosterAddressField" style="display:none;">
+      <label for="catFosterAddressInput">寄养地址</label>
+      <input type="text" id="catFosterAddressInput" maxlength="80" placeholder="例如：XX猫咖（学校东门旁）">
+    </div>
+
+    <div class="cat-editor-title">📷 猫咪照片（可多张 / 多次添加）</div>
+    <div class="cat-photo-boxes" id="catPhotoBoxes"></div>
+
+    <div id="catAdoptionPhotoArea">
+      <div class="cat-editor-title">🏡 领养后的照片（不限张数）</div>
+      <div class="cat-photo-boxes" id="catAdoptionPhotoBoxes"></div>
+    </div>
+
+    <div id="catFosterPhotoArea" style="display:none;">
+      <div class="cat-editor-title">🏠 寄养照片（不限张数）</div>
+      <div class="cat-photo-boxes" id="catFosterPhotoBoxes"></div>
+    </div>
+
+    <div class="row-between" style="margin-top:14px;">
+      <div class="cat-editor-title" style="margin:0;">🪱 驱虫记录</div>
+      <button type="button" class="btn small secondary" id="addDewormBtn">＋ 添加记录</button>
+    </div>
+    <div id="dewormRecordBoxes"></div>
+
+    <p class="modal-error" id="catEditorError"></p>
+    <div class="modal-actions">
+      <button type="button" class="btn ghost" data-close="catEditorOverlay">取消</button>
+      <button type="button" class="btn danger admin-only hidden" id="deleteCatBtn">删除档案</button>
+      <button type="button" class="btn primary" id="saveCatBtn">保存档案</button>
+    </div>
+  </div>
+</div>
+<input type="file" id="catPhotoInput" accept="image/*" multiple hidden>
+<input type="file" id="catAdoptionPhotoInput" accept="image/*" multiple hidden>
+<input type="file" id="catFosterPhotoInput" accept="image/*" multiple hidden>
+
+<!-- 回收站弹窗 -->
+<div class="modal-overlay" id="recycleOverlay">
+  <div class="modal modal-wide">
+    <h3>🗑️ 回收站</h3>
+    <p class="modal-sub">被删除的记录仍保留在这里，可随时恢复</p>
+    <div class="table-wrap">
+      <table id="recycleTable">
+        <thead>
+          <tr>
+            <th>日期</th>
+            <th>类型</th>
+            <th>类别</th>
+            <th>备注</th>
+            <th style="text-align:right;">金额</th>
+            <th style="text-align:right;">操作</th>
+          </tr>
+        </thead>
+        <tbody id="recycleListBody"></tbody>
+      </table>
+      <div id="recycleEmpty" class="empty-tip"><span>🗑️</span>回收站是空的</div>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn ghost" data-close="recycleOverlay">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- 报销单弹窗 -->
+<div class="modal-overlay" id="receiptOverlay">
+  <div class="modal receipt-modal">
+    <div class="receipt-paper">
+      <h3 class="receipt-title">🧾 猫团报销单</h3>
+      <div class="receipt-meta">
+        <span id="receiptDateText"></span>
+        <span id="receiptCountText"></span>
+        <span id="receiptFromText">由Xaiu猫猫守护团生成</span>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th style="width:44px;">序号</th>
+            <th>日期</th>
+            <th>类型</th>
+            <th>类别</th>
+            <th>备注</th>
+            <th style="text-align:right;">金额</th>
+          </tr>
+        </thead>
+        <tbody id="receiptListBody"></tbody>
+      </table>
+      <p class="receipt-total">合计金额：<b id="receiptTotal">¥0.00</b></p>
+    </div>
+    <div class="modal-actions no-print">
+      <button type="button" class="btn ghost" data-close="receiptOverlay">关闭</button>
+      <button type="button" class="btn primary" id="printReceiptBtn">🖨️ 打印 / 截图</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+'use strict';
+
+const STORAGE_KEY = 'catLedgerRecords';
+const PASS_KEY = 'adminPassword';
+const BUDGET_KEY = 'monthlyBudget';
+const CATS_KEY = 'catProfiles';
+const ADMINS_KEY = 'adminAccounts';
+const ADMIN_SESSION_KEY = 'catAdminSession';
+const DEFAULT_PASSWORD = 'cat2026';
+const CATEGORIES = ['猫粮','罐头','绝育','医疗','义卖','捐款','捐赠','其他'];
+
+const $ = (id) => document.getElementById(id);
+let records = loadRecords();
+let cats = loadCats();
+let adminLoggedIn = false;
+let currentAdminName = '';
+let selectedIds = new Set();
+let budgetAlertShown = false;
+let pieChart = null;
+let lineChart = null;
+let catDraft = null;
+
+/* ---------- 基础工具 ---------- */
+function escapeHtml(value){
+  return String(value == null ? '' : value).replace(/[&<>"']/g, function(ch){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch];
+  });
+}
+function pad2(n){return String(n).padStart(2,'0');}
+function todayStr(){
+  const d = new Date();
+  return d.getFullYear() + '-' + pad2(d.getMonth()+1) + '-' + pad2(d.getDate());
+}
+function currentMonthKey(){
+  const d = new Date();
+  return d.getFullYear() + '-' + pad2(d.getMonth()+1);
+}
+function monthKeyOf(dateStr){
+  return String(dateStr || '').slice(0,7);
+}
+function formatMoney(num){
+  const n = Number(num) || 0;
+  return '¥' + n.toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+function signedMoney(r){
+  const n = Number(r.amount) || 0;
+  return (r.type === 'income' ? '+' : '-') + '¥' + n.toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+function showToast(msg){
+  const toast = $('toast');
+  toast.textContent = msg;
+  toast.classList.add('show');
+  clearTimeout(showToast._timer);
+  showToast._timer = setTimeout(function(){toast.classList.remove('show');}, 2400);
+}
+
+/* ---------- localStorage / sessionStorage ---------- */
+function readLS(key){
+  try{ return localStorage.getItem(key); }catch(e){ return null; }
+}
+function writeLS(key, val){
+  try{ localStorage.setItem(key, val); return true; }
+  catch(e){ alert('浏览器存储不可用，数据可能无法保存'); return false; }
+}
+function readSS(key){
+  try{ return sessionStorage.getItem(key); }catch(e){ return null; }
+}
+function writeSS(key, val){
+  try{ sessionStorage.setItem(key, val); }catch(e){}
+}
+function removeSS(key){
+  try{ sessionStorage.removeItem(key); }catch(e){}
+}
+function getAdminAccounts(){
+  let list = [];
+  const raw = readLS(ADMINS_KEY);
+  if(raw){
+    try{
+      const parsed = JSON.parse(raw);
+      if(Array.isArray(parsed)) list = parsed;
+    }catch(e){ list = []; }
+  }
+  if(list.length === 0){
+    const legacy = readLS(PASS_KEY);
+    list = [{
+      name: '团长',
+      password: (legacy && legacy !== '') ? legacy : DEFAULT_PASSWORD,
+      createdAt: new Date().toISOString()
+    }];
+    saveAdminAccounts(list);
+  }
+  return list;
+}
+function saveAdminAccounts(list){
+  writeLS(ADMINS_KEY, JSON.stringify(list));
+}
+function verifyAdmin(name, password){
+  const target = String(name || '').trim();
+  return getAdminAccounts().some(function(a){
+    return String(a.name).toLowerCase() === target.toLowerCase() &&
+      a.password === String(password || '');
+  });
+}
+function getAdminPassword(){
+  // 兼容旧的单管理员逻辑：返回主管理员（第一个）的密码
+  const list = getAdminAccounts();
+  return list.length ? list[0].password : DEFAULT_PASSWORD;
+}
+function syncLegacyPassword(name, password){
+  const list = getAdminAccounts();
+  if(list.length && String(list[0].name).toLowerCase() === String(name).toLowerCase()){
+    writeLS(PASS_KEY, password);
+  }
+}
+function addAdminAccount(name, password){
+  const list = getAdminAccounts();
+  list.push({name: name, password: password, createdAt: new Date().toISOString()});
+  saveAdminAccounts(list);
+  syncLegacyPassword(name, password);
+}
+function removeAdminAccount(name){
+  const list = getAdminAccounts();
+  const next = list.filter(function(a){
+    return String(a.name).toLowerCase() !== String(name).toLowerCase();
+  });
+  saveAdminAccounts(next);
+}
+function getBudget(){
+  const raw = readLS(BUDGET_KEY);
+  if(raw === null || raw === '') return null;
+  const val = parseFloat(readLS(BUDGET_KEY));
+  return (isFinite(val) && val > 0) ? val : null;
+}
+function normalizeCat(raw){
+  if(!raw || typeof raw !== 'object') return null;
+  const name = String(raw.name || '').trim();
+  if(!name) return null;
+  const photos = Array.isArray(raw.photos) ? raw.photos.filter(String) : [];
+  const adoptionPhotos = Array.isArray(raw.adoptionPhotos) ? raw.adoptionPhotos.filter(String) : [];
+  const fosterPhotos = Array.isArray(raw.fosterPhotos) ? raw.fosterPhotos.filter(String) : [];
+  const rawVaccine = String(raw.vaccine || '未知');
+  const vaccine = ['未打','已打','未知'].indexOf(rawVaccine) >= 0
+    ? rawVaccine
+    : (rawVaccine === '部分' ? '已打' : '未知');
+  const doseVal = parseInt(raw.vaccineDoses, 10);
+  const vaccineDoses = (vaccine === '已打' && isFinite(doseVal) && doseVal >= 1 && doseVal <= 3)
+    ? doseVal
+    : (vaccine === '已打' ? 3 : null);
+  const dewormRecords = Array.isArray(raw.dewormRecords)
+    ? raw.dewormRecords.map(function(r, i){
+        const date = String(r && r.date || '').trim();
+        const medicine = String(r && r.medicine || '').trim();
+        if(!date || !medicine) return null;
+        return {
+          id: String(r.id || 'dw' + Date.now() + '-' + i),
+          date: date,
+          type: ['内驱','外驱','内外驱'].indexOf(r.type) >= 0 ? r.type : '内驱',
+          medicine: medicine
+        };
+      }).filter(Boolean)
+    : [];
+  return {
+    id: String(raw.id || genId()),
+    name: name,
+    gender: ['公','母','未知'].indexOf(raw.gender) >= 0 ? raw.gender : '未知',
+    vaccine: vaccine,
+    vaccineDoses: vaccineDoses,
+    neutered: ['已绝育','未绝育','未知'].indexOf(raw.neutered) >= 0 ? raw.neutered : '未知',
+    adopted: !!raw.adopted,
+    photos: photos,
+    adoptionPhotos: adoptionPhotos,
+    fostered: !!raw.fostered,
+    fosterAddress: String(raw.fosterAddress || ''),
+    fosterPhotos: fosterPhotos,
+    dewormRecords: dewormRecords,
+    note: String(raw.note || ''),
+    createdAt: String(raw.createdAt || new Date().toISOString()),
+    updatedAt: String(raw.updatedAt || new Date().toISOString())
+  };
+}
+function loadCats(){
+  const raw = readLS(CATS_KEY);
+  if(!raw) return [];
+  try{
+    const arr = JSON.parse(raw);
+    if(!Array.isArray(arr)) return [];
+    return arr.map(normalizeCat).filter(Boolean);
+  }catch(e){ return []; }
+}
+function saveCats(){
+  writeLS(CATS_KEY, JSON.stringify(cats));
+}
+function activeCats(){
+  return cats.slice().sort(function(a,b){
+    return String(b.updatedAt).localeCompare(String(a.updatedAt));
+  });
+}
+
+/* ---------- 数据 ---------- */
+function genId(){
+  return 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
+}
+function normalizeRecord(raw){
+  if(!raw || typeof raw !== 'object') return null;
+  const type = (raw.type === 'income') ? 'income' : 'expense';
+  const amount = Math.abs(parseFloat(raw.amount)) || 0;
+  if(!isFinite(amount) || amount < 0) return null;
+  if(amount === 0 && ['捐赠','捐款'].indexOf(raw.category) < 0) return null;
+  const date = String(raw.date || '');
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+  const category = CATEGORIES.indexOf(raw.category) >= 0 ? raw.category : '其他';
+  return {
+    id: String(raw.id || genId()),
+    type: type,
+    category: category,
+    amount: Math.round(amount * 100) / 100,
+    donor: String(raw.donor || ''),
+    note: String(raw.note || ''),
+    date: date,
+    createdAt: String(raw.createdAt || new Date().toISOString()),
+    deleted: !!raw.deleted
+  };
+}
+function loadRecords(){
+  const raw = readLS(STORAGE_KEY);
+  if(!raw) return [];
+  try{
+    const arr = JSON.parse(raw);
+    if(!Array.isArray(arr)) return [];
+    return arr.map(normalizeRecord).filter(Boolean);
+  }catch(e){ return []; }
+}
+function saveRecords(){
+  writeLS(STORAGE_KEY, JSON.stringify(records));
+}
+function activeRecords(){
+  return records
+    .filter(function(r){ return !r.deleted; })
+    .sort(function(a,b){
+      return b.date.localeCompare(a.date) || String(b.createdAt).localeCompare(String(a.createdAt));
+    });
+}
+function deletedRecords(){
+  return records
+    .filter(function(r){ return r.deleted; })
+    .sort(function(a,b){
+      return b.date.localeCompare(a.date) || String(b.createdAt).localeCompare(String(a.createdAt));
+    });
+}
+function findRecord(id){
+  for(let i=0;i<records.length;i++){
+    if(records[i].id === id) return {index:i, record:records[i]};
+  }
+  return null;
+}
+
+function calcStats(){
+  let totalIncome = 0;
+  let totalExpense = 0;
+  let monthExpense = 0;
+  const mKey = currentMonthKey();
+  for(const r of records){
+    if(r.deleted) continue;
+    if(r.type === 'income'){
+      totalIncome += r.amount;
+    }else{
+      totalExpense += r.amount;
+      if(monthKeyOf(r.date) === mKey) monthExpense += r.amount;
+    }
+  }
+  return {
+    totalIncome: Math.round(totalIncome*100)/100,
+    totalExpense: Math.round(totalExpense*100)/100,
+    balance: Math.round((totalIncome - totalExpense)*100)/100,
+    monthExpense: Math.round(monthExpense*100)/100
+  };
+}
+
+/* ---------- 统计与预算 ---------- */
+function renderStats(){
+  const st = calcStats();
+  $('totalIncome').textContent = formatMoney(st.totalIncome);
+  $('totalExpense').textContent = formatMoney(st.totalExpense);
+  $('totalBalance').textContent = formatMoney(st.balance);
+  $('monthExpense').textContent = formatMoney(st.monthExpense);
+  $('totalBalance').style.color = st.balance < 0 ? 'var(--red)' : '';
+}
+
+function renderBudget(notify){
+  const st = calcStats();
+  const used = st.monthExpense;
+  const budget = getBudget();
+  const panel = $('budgetPanel');
+  const monthCard = $('monthExpenseCard');
+  if(budget === null){
+    panel.classList.add('hidden');
+    $('budgetEmptyCard').classList.remove('hidden');
+    monthCard.classList.remove('warn','danger');
+    $('budgetProgress').style.width = '0%';
+    return;
+  }
+  panel.classList.remove('hidden');
+  $('budgetEmptyCard').classList.add('hidden');
+  const over = Math.round((used - budget)*100)/100;
+  const pct = budget > 0 ? used/budget*100 : (used > 0 ? 200 : 0);
+  const clampedPct = Math.min(pct, 100);
+
+  $('budgetUsed').textContent = formatMoney(used);
+  $('budgetRemain').textContent = over > 0 ? '已超支 ' + formatMoney(Math.abs(over)) : formatMoney(budget - used);
+  $('budgetRemain').className = over > 0 ? 'over' : '';
+  $('budgetPercent').textContent = (pct >= 100 ? Math.floor(pct) : pct.toFixed(1)) + '%';
+  $('budgetProgress').style.width = clampedPct + '%';
+
+  panel.classList.remove('warn','danger');
+  monthCard.classList.remove('warn','danger');
+
+  if(over > 0){
+    panel.classList.add('danger');
+    monthCard.classList.add('card-danger');
+    $('budgetTip').textContent = '⚠️ 本月支出已超预算 ' + formatMoney(Math.abs(over)) + '，请留意开支！';
+  }else if(pct >= 80){
+    panel.classList.add('warn');
+    monthCard.classList.add('card-warn');
+    $('budgetTip').textContent = pct >= 100
+      ? '本月预算刚好用完，暂无超支，请继续留意后续支出。'
+      : '⚠️ 本月预算已使用 ' + pct.toFixed(0) + '%，接近上限，请注意控制支出。';
+  }else{
+    $('budgetTip').textContent = used > 0
+      ? '本月预算已使用 ' + pct.toFixed(1) + '%，目前还有 ' + formatMoney(budget - used) + ' 可用。'
+      : '本月还没有支出，预算充足，可以安心采购啦。';
+  }
+
+  if(notify && over > 0 && !budgetAlertShown){
+    budgetAlertShown = true;
+    setTimeout(function(){
+      alert('⚠️ 本月支出已超过预算！\n\n已支出：' + formatMoney(used) +
+        '\n本月预算：' + formatMoney(budget) +
+        '\n超出：' + formatMoney(Math.abs(over)) +
+        '\n\n建议调整后续开支安排。');
+    }, 60);
+  }
+  if(over <= 0){
+    budgetAlertShown = false;
+  }
+}
+
+function renderCatSummary(){
+  const list = activeCats();
+  $('catTotal').textContent = list.length;
+  $('catPending').textContent = list.filter(function(c){ return !c.adopted; }).length;
+  $('catAdopted').textContent = list.filter(function(c){ return c.adopted; }).length;
+  $('catVaccinated').textContent = list.filter(function(c){ return c.vaccine === '已打'; }).length;
+}
+
+function renderCats(){
+  const list = activeCats();
+  $('catArchiveEmpty').hidden = list.length > 0;
+  $('catsGrid').innerHTML = list.map(function(c){
+    const mainThumbs = (c.photos || []).slice(1).map(function(src){
+      return '<a href="' + src + '" target="_blank" rel="noopener"><img src="' + src + '" alt="' + escapeHtml(c.name) + '" loading="lazy"></a>';
+    }).join('');
+    const adoptionPhotos = (c.adoptionPhotos || []).map(function(src){
+      return '<a href="' + src + '" target="_blank" rel="noopener"><img src="' + src + '" alt="领养后照片" loading="lazy"></a>';
+    }).join('');
+    const fosterPhotos = (c.fosterPhotos || []).map(function(src){
+      return '<a href="' + src + '" target="_blank" rel="noopener"><img src="' + src + '" alt="寄养照片" loading="lazy"></a>';
+    }).join('');
+    const vaccineText = c.vaccine === '已打'
+      ? '已打' + (c.vaccineDoses ? c.vaccineDoses : '?') + '针'
+      : (c.vaccine || '未知');
+    const dewormLines = (c.dewormRecords || []).slice().sort(function(a, b){
+      return String(b.date).localeCompare(String(a.date));
+    }).slice(0, 4).map(function(r){
+      return '<div class="cat-note" style="margin-top:2px;">🪱 ' + escapeHtml(r.date) + ' · ' + escapeHtml(r.type) + ' · ' + escapeHtml(r.medicine) + '</div>';
+    }).join('');
+    const actions = adminLoggedIn
+      ? '<div class="cat-card-actions">' +
+          '<button type="button" class="btn small secondary cat-edit-btn" data-cat-id="' + c.id + '">✏️ 编辑</button>' +
+          '<button type="button" class="btn small danger cat-del-btn" data-cat-id="' + c.id + '">🗑️ 删除</button>' +
+        '</div>'
+      : '';
+    return '<div class="cat-card">' +
+      '<div class="cat-cover">' +
+        (c.photos && c.photos.length
+          ? '<img src="' + c.photos[0] + '" alt="' + escapeHtml(c.name) + '">'
+          : '🐱') +
+      '</div>' +
+      '<div class="cat-body">' +
+        '<div class="cat-name-row">' +
+          '<h3>' + escapeHtml(c.name) + '</h3>' +
+          (c.adopted ? '<span class="cat-chip adopted">🏡 已领养</span>' : '<span class="cat-chip">待领养</span>') +
+          (c.fostered ? '<span class="cat-chip adopted">🏠 寄养中</span>' : '') +
+        '</div>' +
+        '<div class="cat-chips">' +
+          '<span class="cat-chip">' + escapeHtml(c.gender) + '</span>' +
+          '<span class="cat-chip ' + (c.vaccine === '已打' ? 'vaccinated' : '') + '">疫苗：' + escapeHtml(vaccineText) + '</span>' +
+          '<span class="cat-chip">绝育：' + escapeHtml(c.neutered) + '</span>' +
+        '</div>' +
+        (c.fostered && c.fosterAddress ? '<p class="cat-note" style="margin-top:2px;">🏠 寄养地址：' + escapeHtml(c.fosterAddress) + '</p>' : '') +
+        (c.note ? '<p class="cat-note">' + escapeHtml(c.note) + '</p>' : '') +
+        dewormLines +
+        (c.photos && c.photos.length > 1
+          ? '<div class="cat-album"><div class="cat-album-label">更多照片（' + (c.photos.length - 1) + '）</div><div class="cat-album-grid">' + mainThumbs + '</div></div>'
+          : '') +
+        (c.adopted && c.adoptionPhotos && c.adoptionPhotos.length
+          ? '<div class="cat-album"><div class="cat-album-label">🏡 领养后照片（' + c.adoptionPhotos.length + '）</div><div class="cat-album-grid">' + adoptionPhotos + '</div></div>'
+          : '') +
+        (c.fostered && c.fosterPhotos && c.fosterPhotos.length
+          ? '<div class="cat-album"><div class="cat-album-label">🏠 寄养照片（' + c.fosterPhotos.length + '）</div><div class="cat-album-grid">' + fosterPhotos + '</div></div>'
+          : '') +
+        actions +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function renderCatPhotoBoxes(){
+  if(!catDraft) return;
+  const mainBoxes = catDraft.photos.map(function(src, i){
+    return '<div class="cat-photo-box"><img src="' + src + '" alt="猫咪照片"><span class="cat-photo-del" data-kind="photos" data-index="' + i + '">×</span></div>';
+  }).join('');
+  $('catPhotoBoxes').innerHTML = mainBoxes +
+    '<label class="cat-add-photo" for="catPhotoInput">＋ 添加照片</label>';
+
+  const adoptBoxes = catDraft.adoptionPhotos.map(function(src, i){
+    return '<div class="cat-photo-box"><img src="' + src + '" alt="领养后照片"><span class="cat-photo-del" data-kind="adoptionPhotos" data-index="' + i + '">×</span></div>';
+  }).join('');
+  $('catAdoptionPhotoBoxes').innerHTML = adoptBoxes +
+    '<label class="cat-add-photo" for="catAdoptionPhotoInput">＋ 添加照片</label>';
+  $('catAdoptionPhotoArea').style.display = catDraft.adopted ? '' : 'none';
+
+  const fosterBoxes = catDraft.fosterPhotos.map(function(src, i){
+    return '<div class="cat-photo-box"><img src="' + src + '" alt="寄养照片"><span class="cat-photo-del" data-kind="fosterPhotos" data-index="' + i + '">×</span></div>';
+  }).join('');
+  $('catFosterPhotoBoxes').innerHTML = fosterBoxes +
+    '<label class="cat-add-photo" for="catFosterPhotoInput">＋ 添加照片</label>';
+  $('catFosterPhotoArea').style.display = catDraft.fostered ? '' : 'none';
+  $('catFosterAddressField').style.display = catDraft.fostered ? '' : 'none';
+}
+
+function openCatEditor(id){
+  if(!adminLoggedIn){
+    alert('只有管理员可以添加或修改猫咪档案');
+    return;
+  }
+  const existing = id ? cats.find(function(c){ return c.id === id; }) : null;
+  catDraft = existing ? JSON.parse(JSON.stringify(existing)) : {
+    id: '',
+    name: '',
+    gender: '未知',
+    vaccine: '未知',
+    vaccineDoses: 3,
+    neutered: '未知',
+    adopted: false,
+    fostered: false,
+    fosterAddress: '',
+    photos: [],
+    adoptionPhotos: [],
+    fosterPhotos: [],
+    dewormRecords: [],
+    note: ''
+  };
+  if(!catDraft.dewormRecords) catDraft.dewormRecords = [];
+  if(catDraft.vaccine === '部分') catDraft.vaccine = '已打';
+  if(catDraft.vaccine === '已打' && !catDraft.vaccineDoses) catDraft.vaccineDoses = 3;
+  $('catEditorTitle').textContent = existing ? '🐱 编辑：' + existing.name : '🐱 添加猫咪';
+  $('catNameInput').value = catDraft.name;
+  $('catGenderSelect').value = catDraft.gender;
+  $('catVaccineSelect').value = catDraft.vaccine;
+  $('catDoseSelect').value = catDraft.vaccine === '已打' ? String(catDraft.vaccineDoses || 3) : '3';
+  $('catNeuteredSelect').value = catDraft.neutered;
+  $('catNoteInput').value = catDraft.note;
+  $('catAdoptedChk').checked = catDraft.adopted;
+  $('catFosteredChk').checked = catDraft.fostered;
+  $('catFosterAddressInput').value = catDraft.fosterAddress;
+  $('deleteCatBtn').classList.toggle('hidden', !catDraft.id);
+  $('catEditorError').textContent = '';
+  renderCatPhotoBoxes();
+  renderDewormRecords();
+  syncCatVaccineUI();
+  openOverlay('catEditorOverlay');
+}
+
+function processCatFiles(files, kind){
+  const targets = Array.from(files || []);
+  if(!targets.length) return;
+  let left = targets.length;
+  targets.forEach(function(file){
+    const reader = new FileReader();
+    reader.onload = function(){
+      const img = new Image();
+      img.onload = function(){
+        const maxSide = 1000;
+        let w = img.width, h = img.height;
+        if(Math.max(w, h) > maxSide){
+          const scale = maxSide / Math.max(w, h);
+          w = Math.round(w * scale);
+          h = Math.round(h * scale);
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        catDraft[kind].push(canvas.toDataURL('image/jpeg', 0.76));
+        if(--left === 0){
+          renderCatPhotoBoxes();
+          showToast('已添加 ' + targets.length + ' 张照片');
+        }
+      };
+      img.onerror = function(){
+        if(--left === 0) renderCatPhotoBoxes();
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function removeCatDraftPhoto(kind, index){
+  if(!catDraft) return;
+  catDraft[kind].splice(index, 1);
+  renderCatPhotoBoxes();
+}
+
+function renderDewormRecords(){
+  if(!catDraft) return;
+  if(!catDraft.dewormRecords) catDraft.dewormRecords = [];
+  const boxes = catDraft.dewormRecords.map(function(r, i){
+    const dp = String(r.date || '').split('.');
+    const dateValue = dp.length === 3
+      ? dp[0] + '-' + pad2(dp[1]) + '-' + pad2(dp[2])
+      : '';
+    return '<div class="deworm-card">' +
+      '<div class="deworm-fields">' +
+        '<label>驱虫日期<input type="date" class="dw-date" data-index="' + i + '" value="' + escapeHtml(dateValue) + '"></label>' +
+        '<label>类型<select class="dw-type" data-index="' + i + '">' +
+          '<option value="内驱"' + (r.type === '内驱' ? ' selected' : '') + '>内驱</option>' +
+          '<option value="外驱"' + (r.type === '外驱' ? ' selected' : '') + '>外驱</option>' +
+          '<option value="内外驱"' + (r.type === '内外驱' ? ' selected' : '') + '>内外驱</option>' +
+        '</select></label>' +
+      '</div>' +
+      '<div class="deworm-med"><input type="text" class="dw-med" data-index="' + i + '" value="' + escapeHtml(r.medicine || '') + '" placeholder="驱虫药名称，自行输入"></div>' +
+      '<button type="button" class="btn small danger dw-del" data-index="' + i + '">删除这条记录</button>' +
+    '</div>';
+  }).join('');
+  $('dewormRecordBoxes').innerHTML = boxes ||
+    '<div class="empty-tip"><span>🪱</span>还没有驱虫记录，点击“添加记录”</div>';
+}
+
+function addDewormRecord(){
+  if(!catDraft) return;
+  const d = new Date();
+  catDraft.dewormRecords.push({
+    id: 'dw' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    date: d.getFullYear() + '.' + (d.getMonth() + 1) + '.' + d.getDate(),
+    type: '内驱',
+    medicine: ''
+  });
+  renderDewormRecords();
+}
+
+function syncCatVaccineUI(){
+  const isVaccinated = $('catVaccineSelect').value === '已打';
+  $('catDoseField').style.display = isVaccinated ? '' : 'none';
+  if(!catDraft) return;
+  catDraft.vaccine = $('catVaccineSelect').value;
+  catDraft.vaccineDoses = isVaccinated ? parseInt($('catDoseSelect').value, 10) : null;
+}
+
+function saveCatDraft(){
+  if(!adminLoggedIn){
+    $('catEditorError').textContent = '请先开启管理员模式';
+    return;
+  }
+  const name = $('catNameInput').value.trim();
+  if(!name){
+    $('catEditorError').textContent = '请填写猫猫姓名';
+    return;
+  }
+  const badDeworm = catDraft.dewormRecords.some(function(r){
+    return !r.date || !String(r.medicine || '').trim();
+  });
+  if(badDeworm){
+    $('catEditorError').textContent = '驱虫记录请补全日期和驱虫药名称';
+    return;
+  }
+  const now = new Date().toISOString();
+  const vaccine = $('catVaccineSelect').value;
+  const data = {
+    id: catDraft.id,
+    name: name,
+    gender: $('catGenderSelect').value,
+    vaccine: vaccine,
+    vaccineDoses: vaccine === '已打' ? parseInt($('catDoseSelect').value, 10) : null,
+    neutered: $('catNeuteredSelect').value,
+    adopted: $('catAdoptedChk').checked,
+    fostered: $('catFosteredChk').checked,
+    fosterAddress: $('catFosterAddressInput').value.trim(),
+    photos: catDraft.photos,
+    adoptionPhotos: catDraft.adoptionPhotos,
+    fosterPhotos: catDraft.fosterPhotos,
+    dewormRecords: catDraft.dewormRecords,
+    note: $('catNoteInput').value.trim(),
+    createdAt: catDraft.createdAt || now,
+    updatedAt: now
+  };
+  if(data.id){
+    const idx = cats.findIndex(function(c){ return c.id === data.id; });
+    if(idx >= 0) cats[idx] = data;
+  }else{
+    data.id = 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+    cats.push(data);
+  }
+  saveCats();
+  closeOverlay('catEditorOverlay');
+  renderAll(false);
+  showToast('猫咪档案已保存');
+}
+
+function deleteCatDraft(){
+  if(!catDraft || !catDraft.id) return;
+  if(!confirm('确定删除 “' + catDraft.name + '” 的档案吗？照片将从网页本地删除。')) return;
+  cats = cats.filter(function(c){ return c.id !== catDraft.id; });
+  saveCats();
+  closeOverlay('catEditorOverlay');
+  renderAll(false);
+  showToast('猫咪档案已删除');
+}
+
+function renderForecast(){
+  const st = calcStats();
+  const used = st.monthExpense;
+  const budget = getBudget();
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = now.getMonth();
+  const totalDays = new Date(y, m + 1, 0).getDate();
+  const dayOfMonth = now.getDate();
+  const remaining = Math.max(totalDays - dayOfMonth, 0);
+  const daily = dayOfMonth > 0 ? used / dayOfMonth : 0;
+  const forecast = Math.round((used + daily * remaining) * 100) / 100;
+  const over = budget === null ? 0 : Math.round((forecast - budget) * 100) / 100;
+
+  let cls = 'forecast-result';
+  let msg = '';
+  if(budget === null){
+    msg = '<p class="forecast-msg ok">本月预算未填写，暂无超支预警；填写预算后会在这里自动预测。</p>';
+  }else if(over > 0){
+    cls += ' danger';
+    const perDayLimit = remaining > 0
+      ? (budget - used) / remaining
+      : 0;
+    msg = '<p class="forecast-msg danger">⚠️ 按当前日均 ' + formatMoney(daily) + '/天 的节奏，月底预计超预算 ' +
+      formatMoney(over) + '。' +
+      (remaining > 0
+        ? '若剩余 ' + remaining + ' 天希望控制在预算内，日均支出应不超过 <b>' + formatMoney(Math.max(perDayLimit,0)) + '</b>，请合理规划开支。'
+        : '') + '</p>';
+  }else{
+    msg = '<p class="forecast-msg ok">按目前节奏，月底预计总支出 ' + formatMoney(forecast) +
+      '，不会超预算' + (remaining > 0 ? '，还有约 ' + formatMoney(budget - forecast) + ' 的余量。' : '。') + '</p>';
+  }
+
+  $('forecastBody').innerHTML =
+    '<div class="forecast-row"><span>本月已支出</span><b>' + formatMoney(used) + '</b></div>' +
+    '<div class="forecast-row"><span>本月日均开支</span><b>' + formatMoney(daily) + '/天</b></div>' +
+    '<div class="forecast-row"><span>距月底还有</span><b>' + remaining + ' 天</b></div>' +
+    '<div class="' + cls + '"><span>月底预计总支出</span><b>' + formatMoney(forecast) + '</b></div>' +
+    msg;
+}
+
+/* ---------- 图表 ---------- */
+function lastMonths(n){
+  const arr = [];
+  const now = new Date();
+  for(let i = n - 1; i >= 0; i--){
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    arr.push(d.getFullYear() + '-' + pad2(d.getMonth() + 1));
+  }
+  return arr;
+}
+function chartPalette(){
+  return ['#FF8C42','#FFB25E','#F3B85E','#E97F3C','#C9662C','#9A6B4F','#B8A99A'];
+}
+function renderCharts(){
+  const chartsReady = (typeof Chart !== 'undefined');
+  if(!chartsReady){
+    $('pieEmpty').hidden = false;
+    $('pieEmpty').textContent = 'Chart.js 加载失败，请检查网络后刷新';
+    $('lineEmpty').hidden = false;
+    $('lineEmpty').textContent = 'Chart.js 加载失败，请检查网络后刷新';
+    return;
+  }
+
+  /* 饼图：本月支出分类 */
+  if(pieChart){ pieChart.destroy(); pieChart = null; }
+  const sums = {};
+  const mKey = currentMonthKey();
+  for(const r of records){
+    if(r.deleted || r.type !== 'expense') continue;
+    if(monthKeyOf(r.date) === mKey){
+      sums[r.category] = (sums[r.category] || 0) + r.amount;
+    }
+  }
+  const pieLabels = Object.keys(sums);
+  $('pieEmpty').hidden = pieLabels.length > 0;
+  if(pieLabels.length > 0){
+    const palette = chartPalette();
+    pieChart = new Chart($('pieChart'), {
+      type: 'doughnut',
+      data: {
+        labels: pieLabels,
+        datasets: [{
+          data: pieLabels.map(function(k){ return Math.round(sums[k]*100)/100; }),
+          backgroundColor: pieLabels.map(function(_,i){ return palette[i % palette.length]; }),
+          borderColor: '#FFFDF8',
+          borderWidth: 2
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {position:'bottom', labels:{padding:14, usePointStyle:true, pointStyle:'circle'}},
+          tooltip: {
+            callbacks: {
+              label: function(ctx){
+                return ' ' + ctx.label + '：' + formatMoney(ctx.parsed);
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+
+  /* 折线图：过去 12 个月 */
+  if(lineChart){ lineChart.destroy(); lineChart = null; }
+  const months = lastMonths(12);
+  const monthTotals = {};
+  for(const r of records){
+    if(r.deleted || r.type !== 'expense') continue;
+    const mk = monthKeyOf(r.date);
+    monthTotals[mk] = (monthTotals[mk] || 0) + r.amount;
+  }
+  const lineData = months.map(function(mk){
+    return Math.round((monthTotals[mk] || 0)*100)/100;
+  });
+  const hasData = lineData.some(function(v){ return v > 0; });
+  $('lineEmpty').hidden = hasData;
+  if(hasData){
+    lineChart = new Chart($('lineChart'), {
+      type: 'line',
+      data: {
+        labels: months.map(function(mk){ return mk.slice(2).replace('-','年') + '月'; }),
+        datasets: [{
+          label: '每月总支出（元）',
+          data: lineData,
+          borderColor: '#FF8C42',
+          backgroundColor: 'rgba(255,140,66,.12)',
+          fill: true,
+          tension: .38,
+          pointBackgroundColor: '#fff',
+          pointBorderColor: '#FF8C42',
+          pointRadius: 4,
+          pointHoverRadius: 6,
+          borderWidth: 2.5
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          y: {
+            beginAtZero: true,
+            grid:{color:'#F3E4D2'},
+            ticks:{callback:function(v){return '¥' + v;}}
+          },
+          x: {
+            grid:{display:false},
+            ticks:{maxRotation:0, autoSkip:true, maxTicksLimit:8}
+          }
+        },
+        plugins: {
+          legend: {display:false},
+          tooltip: {
+            callbacks: {
+              label: function(ctx){ return ' 总支出：' + formatMoney(ctx.parsed.y); }
+            }
+          }
+        }
+      }
+    });
+  }
+}
+
+/* ---------- 记录列表 ---------- */
+function renderRecords(){
+  const list = activeRecords();
+  $('recordCount').textContent = '共 ' + list.length + ' 条';
+  $('recordEmpty').hidden = list.length > 0;
+
+  const rows = list.map(function(r){
+    const checked = selectedIds.has(r.id);
+    const noAmount = Number(r.amount) === 0 && r.category === '捐赠';
+    const typeLabel = noAmount ? '捐赠' : (r.type === 'income' ? '收入' : '支出');
+    const badgeType = noAmount ? '' : r.type;
+    const donorHtml = r.donor ? '<span style="color:#A84F12;">[' + escapeHtml(r.donor) + ']</span> ' : '';
+    const noteHtml = donorHtml + (r.note ? escapeHtml(r.note) : (r.donor ? '' : '<span style="color:#C0AA93">—</span>'));
+    return '<tr class="' + (checked ? 'selected-row' : '') + '">' +
+      '<td><input type="checkbox" class="row-checkbox" data-id="' + r.id + '"' + (checked ? ' checked' : '') + '></td>' +
+      '<td class="date-cell">' + r.date + '</td>' +
+      '<td><span class="type-badge ' + badgeType + '">' + typeLabel + '</span></td>' +
+      '<td>' + escapeHtml(r.category) + '</td>' +
+      '<td class="note-cell" title="' + escapeHtml((r.donor ? '[' + r.donor + '] ' : '') + r.note) + '">' + noteHtml + '</td>' +
+      '<td class="amount-cell ' + badgeType + '">' + (noAmount ? '—' : signedMoney(r)) + '</td>' +
+      '<td class="admin-only hidden action-cell"><button type="button" class="icon-btn delete-btn" data-id="' + r.id + '" title="删除（移入回收站）">🗑️</button></td>' +
+      '</tr>';
+  }).join('');
+  $('recordListBody').innerHTML = rows;
+  updateSelectionUI();
+  updateRecycleButtonCount();
+}
+
+function updateSelectionUI(){
+  const active = activeRecords();
+  const count = active.filter(function(r){ return selectedIds.has(r.id); }).length;
+  $('generateReceiptBtn').disabled = count === 0;
+  $('generateReceiptBtn').textContent = count > 0 ? '🧾 生成报销单（' + count + '）' : '🧾 生成报销单';
+  const allChecked = active.length > 0 && count === active.length;
+  $('selectAllChk').checked = allChecked;
+  $('selectAllChk').indeterminate = count > 0 && !allChecked;
+}
+
+function updateRecycleButtonCount(){
+  $('recycleCount').textContent = records.filter(function(r){ return r.deleted; }).length;
+}
+
+function addRecord(){
+  const date = $('recordDate').value;
+  const type = $('typeSelect').value;
+  const category = $('categorySelect').value;
+  const rawAmount = parseFloat($('amountInput').value) || 0;
+  const donor = $('donorInput').value.trim();
+  const note = $('noteInput').value.trim();
+  const err = $('formError');
+
+  if(!date){
+    err.textContent = '请选择日期';
+    return;
+  }
+  if(category === '捐款'){
+    if(type !== 'income'){
+      err.textContent = '类型为“捐款”时请选择“收入”';
+      return;
+    }
+    if(!donor){
+      err.textContent = '类型为“捐款”时必须填写捐款人';
+      return;
+    }
+    if(!isFinite(rawAmount) || rawAmount <= 0){
+      err.textContent = '类型为“捐款”时请填写收入金额';
+      return;
+    }
+  }
+  if(!isFinite(rawAmount) || rawAmount < 0){
+    err.textContent = '金额无效';
+    return;
+  }
+  if(rawAmount === 0 && ['捐赠','捐款'].indexOf(category) < 0){
+    err.textContent = '请输入大于 0 的金额（捐赠物资可不填金额）';
+    return;
+  }
+
+  records.push({
+    id: genId(),
+    type: type,
+    category: category,
+    amount: Math.round(rawAmount * 100) / 100,
+    donor: donor,
+    note: note,
+    date: date,
+    createdAt: new Date().toISOString(),
+    deleted: false
+  });
+  saveRecords();
+
+  $('amountInput').value = '';
+  $('noteInput').value = '';
+  $('commonNoteSelect').value = '';
+  err.textContent = '';
+  selectedIds.clear();
+  renderAll(true);
+  showToast('✅ 记账成功：' + (type === 'income' ? '收入' : '支出') + ' ' + formatMoney(rawAmount));
+}
+
+function softDeleteRecord(id){
+  const found = findRecord(id);
+  if(!found) return;
+  found.record.deleted = true;
+  selectedIds.delete(id);
+  saveRecords();
+  renderAll(false);
+  showToast('已移入回收站');
+}
+
+function restoreRecord(id){
+  const found = findRecord(id);
+  if(!found) return;
+  found.record.deleted = false;
+  saveRecords();
+  renderAll(false);
+  renderRecycleList();
+  showToast('已恢复 1 条记录');
+}
+
+function deleteForever(id){
+  const found = findRecord(id);
+  if(!found) return;
+  if(!confirm('确定彻底删除这条记录吗？该操作不可恢复。')) return;
+  records.splice(found.index, 1);
+  saveRecords();
+  renderAll(false);
+  renderRecycleList();
+  showToast('已彻底删除');
+}
+
+/* ---------- 回收站 ---------- */
+function renderRecycleList(){
+  const list = deletedRecords();
+  $('recycleEmpty').hidden = list.length > 0;
+  $('recycleTable').hidden = list.length === 0;
+  $('recycleListBody').innerHTML = list.map(function(r){
+    const typeLabel = r.type === 'income' ? '收入' : '支出';
+    const note = r.note ? escapeHtml(r.note) : '<span style="color:#C0AA93">—</span>';
+    return '<tr>' +
+      '<td class="date-cell">' + r.date + '</td>' +
+      '<td><span class="type-badge ' + r.type + '">' + typeLabel + '</span></td>' +
+      '<td>' + escapeHtml(r.category) + '</td>' +
+      '<td class="note-cell" title="' + escapeHtml(r.note) + '">' + note + '</td>' +
+      '<td class="amount-cell ' + r.type + '" style="text-align:right;">' + signedMoney(r) + '</td>' +
+      '<td><div class="recycle-action">' +
+        '<button type="button" class="btn small secondary restore-btn" data-id="' + r.id + '">↩️ 恢复</button>' +
+        '<button type="button" class="btn small danger delete-forever-btn" data-id="' + r.id + '">彻底删除</button>' +
+      '</div></td>' +
+      '</tr>';
+  }).join('');
+  updateRecycleButtonCount();
+}
+
+function openRecycleBin(){
+  renderRecycleList();
+  openOverlay('recycleOverlay');
+}
+
+/* ---------- 报销单 ---------- */
+function openReceipt(){
+  const selected = activeRecords()
+    .filter(function(r){ return selectedIds.has(r.id); })
+    .sort(function(a,b){ return a.date.localeCompare(b.date); });
+
+  if(selected.length === 0){
+    alert('请先在记录列表左侧勾选要报销的记录');
+    return;
+  }
+  let total = 0;
+  const rows = selected.map(function(r, i){
+    total += r.type === 'income' ? r.amount : -r.amount;
+    const typeLabel = r.type === 'income' ? '收入' : '支出';
+    return '<tr>' +
+      '<td>' + (i + 1) + '</td>' +
+      '<td>' + r.date + '</td>' +
+      '<td>' + typeLabel + '</td>' +
+      '<td>' + escapeHtml(r.category) + '</td>' +
+      '<td>' + (r.donor ? '[' + escapeHtml(r.donor) + '] ' : '') + (r.note ? escapeHtml(r.note) : '—') + '</td>' +
+      '<td class="amount-cell ' + r.type + '">' + signedMoney(r) + '</td>' +
+      '</tr>';
+  }).join('');
+
+  const now = new Date();
+  $('receiptDateText').textContent = '日期：' + now.getFullYear() + '-' + pad2(now.getMonth()+1) + '-' + pad2(now.getDate()) +
+    ' ' + pad2(now.getHours()) + ':' + pad2(now.getMinutes());
+  $('receiptCountText').textContent = '共 ' + selected.length + ' 条';
+  $('receiptListBody').innerHTML = rows;
+  $('receiptTotal').textContent = formatMoney(Math.round(total*100)/100);
+  openOverlay('receiptOverlay');
+}
+
+/* ---------- 导出 / 导入 ---------- */
+function escapeCsv(v){
+  const s = String(v == null ? '' : v);
+  return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s;
+}
+function exportCSV(){
+  const sorted = records.slice().sort(function(a,b){
+    return b.date.localeCompare(a.date) || String(b.createdAt).localeCompare(String(a.createdAt));
+  });
+  const hasDonor = sorted.some(function(r){ return String(r.donor || '').trim() !== ''; });
+  const header = ['日期','类型','类别'];
+  if(hasDonor) header.push('捐款人/捐赠人');
+  header.push('金额','备注','是否已删除');
+  const lines = [header.map(escapeCsv).join(',')];
+  for(const r of sorted){
+    const signed = r.type === 'income' ? r.amount : -r.amount;
+    const row = [
+      r.date,
+      r.type === 'income' ? '收入' : '支出',
+      r.category
+    ];
+    if(hasDonor) row.push(r.donor || '');
+    row.push(signed.toFixed(2), r.note, r.deleted ? '是' : '否');
+    lines.push(row.map(escapeCsv).join(','));
+  }
+  const blob = new Blob(['\ufeff' + lines.join('\r\n')], {type:'text/csv;charset=utf-8;'});
+  downloadBlob(blob, 'Xaiu猫猫守护团备份_' + todayStr() + '.csv');
+}
+function exportJSON(){
+  const payload = {
+    version: 2,
+    exportedAt: new Date().toISOString(),
+    records: records,
+    cats: cats,
+    adminAccounts: getAdminAccounts().map(function(a){
+      return {name: a.name, password: a.password, createdAt: a.createdAt};
+    })
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json;charset=utf-8;'});
+  downloadBlob(blob, 'Xaiu猫猫守护团备份_' + todayStr() + '.json');
+}
+function downloadBlob(blob, filename){
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(function(){ URL.revokeObjectURL(a.href); }, 1000);
+}
+function importJSON(file){
+  const reader = new FileReader();
+  reader.onload = function(){
+    try{
+      const data = JSON.parse(reader.result);
+      const rawList = Array.isArray(data) ? data : (data && Array.isArray(data.records) ? data.records : null);
+      if(!rawList) throw new Error('格式不正确');
+      const imported = rawList.map(normalizeRecord).filter(Boolean);
+      if(imported.length === 0) throw new Error('没有找到有效记录');
+      const importedCats = (data && Array.isArray(data.cats))
+        ? data.cats.map(normalizeCat).filter(Boolean)
+        : null;
+      const catText = importedCats ? '、' + importedCats.length + ' 只猫咪档案' : '';
+      if(!confirm('将导入 ' + imported.length + ' 条记录' + catText + '并覆盖当前数据，是否继续？')){
+        return;
+      }
+      records = imported;
+      if(importedCats) cats = importedCats;
+      saveRecords();
+      saveCats();
+      selectedIds.clear();
+      renderAll(false);
+      alert('导入成功：' + imported.length + ' 条记录' + (importedCats ? '、' + importedCats.length + ' 只猫咪' : ''));
+    }catch(e){
+      alert('导入失败：文件内容不是有效的Xaiu猫猫守护团 JSON 备份');
+    }finally{
+      $('importJsonInput').value = '';
+    }
+  };
+  reader.onerror = function(){
+    alert('读取文件失败');
+    $('importJsonInput').value = '';
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+/* ---------- 弹窗 ---------- */
+function openOverlay(id){
+  $(id).classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function closeOverlay(id){
+  $(id).classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+/* ---------- 分享 / 二维码 ---------- */
+function openShareModal(){
+  const url = window.location.href;
+  const box = $('shareQrBox');
+  const hint = $('shareHint');
+  $('shareUrlInput').value = url;
+  box.innerHTML = '';
+  if(/^https?:\/\//i.test(url)){
+    hint.textContent = '用微信扫一扫或手机相机扫码即可打开';
+    const img = document.createElement('img');
+    img.alt = 'Xaiu猫猫守护团二维码';
+    img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=8&data=' + encodeURIComponent(url);
+    img.onerror = function(){
+      hint.textContent = '二维码服务暂时加载失败，请复制网址发送给他人';
+    };
+    box.appendChild(img);
+  }else{
+    hint.textContent = '当前是本地文件，手机无法扫码。请先部署为 https 网址，再打开本按钮即可自动生成二维码。';
+  }
+  openOverlay('shareOverlay');
+}
+function copyShareUrl(){
+  const input = $('shareUrlInput');
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(input.value).then(function(){
+      showToast('网址已复制，可以分享给他人');
+    }).catch(function(){
+      input.select();
+      document.execCommand('copy');
+      showToast('网址已复制');
+    });
+  }else{
+    input.select();
+    document.execCommand('copy');
+    showToast('网址已复制');
+  }
+}
+
+/* ---------- 管理员 ---------- */
+function setAdminUI(on){
+  adminLoggedIn = on;
+  $('adminSwitch').checked = on;
+  $('adminModeText').textContent = on ? '管理员模式（已开启）' : '管理员模式';
+  const els = document.querySelectorAll('.admin-only');
+  for(const el of els){
+    el.classList.toggle('hidden', !on);
+  }
+  if(on){
+    $('entrySection').classList.remove('hidden');
+  }else{
+    selectedIds.clear();
+  }
+  renderRecords();
+  renderCats();
+}
+function logoutAdmin(){
+  removeSS(ADMIN_SESSION_KEY);
+  currentAdminName = '';
+  setAdminUI(false);
+  showToast('已退出管理员模式');
+}
+function openLoginModal(){
+  $('loginName').value = currentAdminName || '团长';
+  $('loginPassword').value = '';
+  $('loginError').textContent = '';
+  openOverlay('loginOverlay');
+  setTimeout(function(){ $('loginPassword').focus(); }, 60);
+}
+function attemptLogin(){
+  const name = $('loginName').value.trim();
+  const pwd = $('loginPassword').value;
+  if(verifyAdmin(name, pwd)){
+    currentAdminName = name;
+    closeOverlay('loginOverlay');
+    writeSS(ADMIN_SESSION_KEY, name);
+    setAdminUI(true);
+    showToast('🔓 管理员「' + name + '」已开启');
+  }else{
+    $('loginError').textContent = '账号或密码错误，请重试';
+    $('loginName').select();
+    $('loginPassword').value = '';
+    $('loginPassword').focus();
+  }
+}
+function openPwdModal(){
+  $('currentPwd').value = '';
+  $('newPwd').value = '';
+  $('confirmPwd').value = '';
+  $('pwdError').textContent = '';
+  openOverlay('pwdOverlay');
+  setTimeout(function(){ $('currentPwd').focus(); }, 60);
+}
+function attemptPwdChange(){
+  const current = $('currentPwd').value;
+  const next = $('newPwd').value;
+  const confirm = $('confirmPwd').value;
+  const err = $('pwdError');
+  const list = getAdminAccounts();
+  const me = list.find(function(a){
+    return String(a.name).toLowerCase() === String(currentAdminName).toLowerCase();
+  });
+  if(!me){
+    err.textContent = '找不到当前管理员账号，请重新登录';
+    return;
+  }
+  if(current !== me.password){
+    err.textContent = '当前密码不正确';
+    return;
+  }
+  if(!next){
+    err.textContent = '新密码不能为空';
+    return;
+  }
+  if(next !== confirm){
+    err.textContent = '两次输入的新密码不一致';
+    return;
+  }
+  if(next === current){
+    err.textContent = '新密码不能与当前密码相同';
+    return;
+  }
+  me.password = next;
+  saveAdminAccounts(list);
+  syncLegacyPassword(me.name, next);
+  closeOverlay('pwdOverlay');
+  alert('密码修改成功');
+}
+
+function openAdminAccountsModal(){
+  renderAdminAccountsList();
+  $('newAdminName').value = '';
+  $('newAdminPassword').value = '';
+  $('adminAccountError').textContent = '';
+  openOverlay('adminAccountsOverlay');
+}
+function renderAdminAccountsList(){
+  const list = getAdminAccounts();
+  $('adminAccountsList').innerHTML = list.map(function(a){
+    const isMe = String(a.name).toLowerCase() === String(currentAdminName).toLowerCase();
+    return '<div class="admin-account-row">' +
+      '<span>🐱 ' + escapeHtml(a.name) + (isMe ? ' <span class="current">（当前）</span>' : '') + '</span>' +
+      (isMe
+        ? '<span style="display:flex;gap:6px;">' +
+            '<button type="button" class="btn small primary" id="selfRenameBtn">改昵称</button>' +
+            '<button type="button" class="btn small ghost" id="selfChangePwdBtn">修改密码</button>' +
+          '</span>'
+        : '<button type="button" class="btn small danger remove-admin-btn" data-admin-name="' + escapeHtml(a.name) + '">移除</button>') +
+    '</div>';
+  }).join('');
+  const selfBtn = $('selfChangePwdBtn');
+  if(selfBtn) selfBtn.addEventListener('click', function(){
+    closeOverlay('adminAccountsOverlay');
+    openPwdModal();
+  });
+  const renameBtn = $('selfRenameBtn');
+  if(renameBtn) renameBtn.addEventListener('click', function(){
+    $('renameAdminName').value = currentAdminName;
+    $('renameAdminError').textContent = '';
+    openOverlay('renameOverlay');
+  });
+}
+function submitRenameAdmin(){
+  const newName = $('renameAdminName').value.trim();
+  const errorEl = $('renameAdminError');
+  errorEl.textContent = '';
+  if(!newName){
+    errorEl.textContent = '昵称不能为空';
+    return;
+  }
+  const list = getAdminAccounts();
+  if(list.some(function(a){
+    return String(a.name).toLowerCase() === newName.toLowerCase() &&
+      String(a.name).toLowerCase() !== String(currentAdminName).toLowerCase();
+  })){
+    errorEl.textContent = '该昵称已被其他管理员使用';
+    return;
+  }
+  const me = list.find(function(a){
+    return String(a.name).toLowerCase() === String(currentAdminName).toLowerCase();
+  });
+  if(!me) return;
+  me.name = newName;
+  saveAdminAccounts(list);
+  syncLegacyPassword(newName, me.password);
+  currentAdminName = newName;
+  writeSS(ADMIN_SESSION_KEY, newName);
+  $('adminModeText').textContent = '管理员模式（已开启）';
+  closeOverlay('renameOverlay');
+  openAdminAccountsModal();
+  showToast('昵称已改为「' + newName + '」');
+}
+function submitAddAdmin(){
+  const name = $('newAdminName').value.trim();
+  const password = $('newAdminPassword').value;
+  const errorEl = $('adminAccountError');
+  errorEl.textContent = '';
+  if(!name || password.length < 4){
+    errorEl.textContent = '管理员名称不能为空，密码至少 4 位';
+    return;
+  }
+  const list = getAdminAccounts();
+  if(list.some(function(a){ return String(a.name).toLowerCase() === name.toLowerCase(); })){
+    errorEl.textContent = '该管理员名称已存在';
+    return;
+  }
+  addAdminAccount(name, password);
+  renderAdminAccountsList();
+  $('newAdminName').value = '';
+  $('newAdminPassword').value = '';
+  showToast('管理员「' + name + '」已添加');
+}
+function submitRemoveAdmin(name){
+  if(String(name).toLowerCase() === String(currentAdminName).toLowerCase()){
+    alert('不能移除当前登录的自己');
+    return;
+  }
+  if(!confirm('确定移除管理员「' + name + '」吗？')) return;
+  removeAdminAccount(name);
+  renderAdminAccountsList();
+  showToast('已移除管理员「' + name + '」');
+}
+
+/* ---------- 渲染汇总 ---------- */
+function renderAll(notifyBudget){
+  renderStats();
+  renderBudget(!!notifyBudget);
+  renderCatSummary();
+  renderCats();
+  renderForecast();
+  renderRecords();
+  renderCharts();
+  updateRecycleButtonCount();
+}
+
+/* ---------- 事件绑定 ---------- */
+function bindEvents(){
+  $('shareBtn').addEventListener('click', openShareModal);
+  $('copyShareUrlBtn').addEventListener('click', copyShareUrl);
+
+  $('ledgerForm').addEventListener('submit', function(e){
+    e.preventDefault();
+    addRecord();
+  });
+
+  $('adminSwitch').addEventListener('change', function(){
+    if($('adminSwitch').checked){
+      if(adminLoggedIn) return;
+      $('adminSwitch').checked = false;
+      openLoginModal();
+    }else if(adminLoggedIn){
+      logoutAdmin();
+    }
+  });
+
+  $('loginConfirmBtn').addEventListener('click', attemptLogin);
+  $('loginPassword').addEventListener('keydown', function(e){
+    if(e.key === 'Enter'){ e.preventDefault(); attemptLogin(); }
+  });
+  $('changePwdBtn').addEventListener('click', openPwdModal);
+  $('pwdConfirmBtn').addEventListener('click', attemptPwdChange);
+  $('currentPwd').addEventListener('input', function(){ $('pwdError').textContent = ''; });
+
+  $('enableBudgetBtn').addEventListener('click', function(){
+    $('budgetEmptyCard').classList.add('hidden');
+    $('budgetPanel').classList.remove('hidden');
+    $('budgetInput').value = '';
+    $('budgetInput').focus();
+  });
+  $('budgetSaveBtn').addEventListener('click', function(){
+    const rawValue = $('budgetInput').value.trim();
+    if(rawValue === ''){
+      writeLS(BUDGET_KEY, '');
+      renderAll(false);
+      showToast('已清除本月预算（不填即隐藏）');
+      return;
+    }
+    const val = parseFloat(rawValue);
+    if(!isFinite(val) || val <= 0){
+      alert('请输入大于 0 的预算金额');
+      return;
+    }
+    writeLS(BUDGET_KEY, String(Math.round(val*100)/100));
+    renderAll(true);
+    showToast('本月预算已更新为 ' + formatMoney(val));
+  });
+  $('budgetInput').addEventListener('keydown', function(e){
+    if(e.key === 'Enter'){ e.preventDefault(); $('budgetSaveBtn').click(); }
+  });
+
+  $('viewCatsBtn').addEventListener('click', function(){
+    $('catArchiveSection').scrollIntoView({behavior:'smooth'});
+  });
+  $('manageCatBtn').addEventListener('click', function(){ openCatEditor(''); });
+  $('addCatBtn').addEventListener('click', function(){ openCatEditor(''); });
+  $('saveCatBtn').addEventListener('click', saveCatDraft);
+  $('deleteCatBtn').addEventListener('click', deleteCatDraft);
+  $('catAdoptedChk').addEventListener('change', function(){
+    if(catDraft){
+      catDraft.adopted = $('catAdoptedChk').checked;
+      renderCatPhotoBoxes();
+    }
+  });
+  $('catFosteredChk').addEventListener('change', function(){
+    if(catDraft){
+      catDraft.fostered = $('catFosteredChk').checked;
+      catDraft.fosterAddress = $('catFosterAddressInput').value.trim();
+      renderCatPhotoBoxes();
+    }
+  });
+  $('catFosterAddressInput').addEventListener('input', function(){
+    if(catDraft) catDraft.fosterAddress = $('catFosterAddressInput').value;
+  });
+  $('catVaccineSelect').addEventListener('change', syncCatVaccineUI);
+  $('catDoseSelect').addEventListener('change', function(){
+    if(catDraft) catDraft.vaccineDoses = parseInt($('catDoseSelect').value, 10);
+  });
+  $('addDewormBtn').addEventListener('click', addDewormRecord);
+  $('dewormRecordBoxes').addEventListener('click', function(e){
+    const del = e.target.closest('.dw-del');
+    if(!del || !catDraft) return;
+    catDraft.dewormRecords.splice(parseInt(del.dataset.index, 10), 1);
+    renderDewormRecords();
+  });
+  $('dewormRecordBoxes').addEventListener('input', function(e){
+    const field = e.target.closest('.dw-date, .dw-med');
+    if(!field || !catDraft) return;
+    const index = parseInt(field.dataset.index, 10);
+    const rec = catDraft.dewormRecords[index];
+    if(!rec) return;
+    if(field.classList.contains('dw-date')){
+      rec.date = String(field.value).replace(/-/g, '.');
+    }else{
+      rec.medicine = field.value;
+    }
+  });
+  $('dewormRecordBoxes').addEventListener('change', function(e){
+    const field = e.target.closest('.dw-type');
+    if(!field || !catDraft) return;
+    const index = parseInt(field.dataset.index, 10);
+    if(catDraft.dewormRecords[index]) catDraft.dewormRecords[index].type = field.value;
+  });
+  $('catPhotoBoxes').addEventListener('click', function(e){
+    const del = e.target.closest('.cat-photo-del');
+    if(del) removeCatDraftPhoto(del.dataset.kind, parseInt(del.dataset.index, 10));
+  });
+  $('catAdoptionPhotoBoxes').addEventListener('click', function(e){
+    const del = e.target.closest('.cat-photo-del');
+    if(del) removeCatDraftPhoto(del.dataset.kind, parseInt(del.dataset.index, 10));
+  });
+  $('catFosterPhotoBoxes').addEventListener('click', function(e){
+    const del = e.target.closest('.cat-photo-del');
+    if(del) removeCatDraftPhoto(del.dataset.kind, parseInt(del.dataset.index, 10));
+  });
+  $('catPhotoInput').addEventListener('change', function(){
+    processCatFiles($('catPhotoInput').files, 'photos');
+    $('catPhotoInput').value = '';
+  });
+  $('catAdoptionPhotoInput').addEventListener('change', function(){
+    processCatFiles($('catAdoptionPhotoInput').files, 'adoptionPhotos');
+    $('catAdoptionPhotoInput').value = '';
+  });
+  $('catFosterPhotoInput').addEventListener('change', function(){
+    processCatFiles($('catFosterPhotoInput').files, 'fosterPhotos');
+    $('catFosterPhotoInput').value = '';
+  });
+  $('catsGrid').addEventListener('click', function(e){
+    const editBtn = e.target.closest('.cat-edit-btn');
+    if(editBtn){ openCatEditor(editBtn.dataset.catId); return; }
+    const delBtn = e.target.closest('.cat-del-btn');
+    if(delBtn){
+      const cat = cats.find(function(c){ return c.id === delBtn.dataset.catId; });
+      if(cat && confirm('确定删除 “' + cat.name + '” 的档案吗？照片将从网页本地删除。')){
+        cats = cats.filter(function(c){ return c.id !== cat.id; });
+        saveCats();
+        renderAll(false);
+        showToast('猫咪档案已删除');
+      }
+    }
+  });
+  $('adminAccountsBtn').addEventListener('click', openAdminAccountsModal);
+  $('addAdminAccountBtn').addEventListener('click', submitAddAdmin);
+  $('renameAdminConfirmBtn').addEventListener('click', submitRenameAdmin);
+  $('adminAccountsList').addEventListener('click', function(e){
+    const btn = e.target.closest('.remove-admin-btn');
+    if(btn) submitRemoveAdmin(btn.dataset.adminName);
+  });
+  $('loginName').addEventListener('keydown', function(e){
+    if(e.key === 'Enter'){ e.preventDefault(); $('loginPassword').focus(); }
+  });
+
+  $('typeSelect').addEventListener('change', updateAmountHint);
+  function updateAmountHint(){
+    const type = $('typeSelect').value;
+    $('amountHint').innerHTML = type === 'expense'
+      ? '支出会自动记为负数，例如输入 50 会记作 <b>-¥50.00</b>'
+      : '收入将记为正数，例如输入 50 会记作 <b>+¥50.00</b>';
+  }
+  updateAmountHint();
+
+  $('commonNoteSelect').addEventListener('change', function(){
+    const val = $('commonNoteSelect').value;
+    if(val) $('noteInput').value = val;
+  });
+
+  $('recordListBody').addEventListener('change', function(e){
+    const cb = e.target.closest('.row-checkbox');
+    if(!cb) return;
+    const id = cb.dataset.id;
+    if(cb.checked){
+      selectedIds.add(id);
+    }else{
+      selectedIds.delete(id);
+    }
+    const tr = cb.closest('tr');
+    if(tr) tr.classList.toggle('selected-row', cb.checked);
+    updateSelectionUI();
+  });
+  $('recordListBody').addEventListener('click', function(e){
+    const btn = e.target.closest('.delete-btn');
+    if(btn) softDeleteRecord(btn.dataset.id);
+  });
+
+  $('selectAllChk').addEventListener('change', function(){
+    if($('selectAllChk').checked){
+      activeRecords().forEach(function(r){ selectedIds.add(r.id); });
+    }else{
+      selectedIds.clear();
+    }
+    renderRecords();
+  });
+
+  $('generateReceiptBtn').addEventListener('click', openReceipt);
+  $('printReceiptBtn').addEventListener('click', function(){ window.print(); });
+
+  $('recycleBinBtn').addEventListener('click', openRecycleBin);
+  $('recycleListBody').addEventListener('click', function(e){
+    const restoreBtn = e.target.closest('.restore-btn');
+    if(restoreBtn){ restoreRecord(restoreBtn.dataset.id); return; }
+    const foreverBtn = e.target.closest('.delete-forever-btn');
+    if(foreverBtn) deleteForever(foreverBtn.dataset.id);
+  });
+
+  $('exportCsvBtn').addEventListener('click', exportCSV);
+  $('exportJsonBtn').addEventListener('click', exportJSON);
+  $('importJsonBtn').addEventListener('click', function(){ $('importJsonInput').click(); });
+  $('importJsonInput').addEventListener('change', function(){
+    const file = $('importJsonInput').files[0];
+    if(file) importJSON(file);
+  });
+
+  document.querySelectorAll('[data-close]').forEach(function(btn){
+    btn.addEventListener('click', function(){ closeOverlay(btn.dataset.close); });
+  });
+
+  document.addEventListener('keydown', function(e){
+    if(e.key === 'Escape'){
+      ['shareOverlay','loginOverlay','pwdOverlay','recycleOverlay','receiptOverlay','adminAccountsOverlay','renameOverlay','catEditorOverlay'].forEach(function(id){
+        if($(id).classList.contains('open')) closeOverlay(id);
+      });
+    }
+  });
+}
+
+/* ---------- 初始化 ---------- */
+function init(){
+  $('recordDate').value = todayStr();
+  const budget = getBudget();
+  $('budgetInput').value = budget === null ? '' : budget;
+  bindEvents();
+  const sessionName = readSS(ADMIN_SESSION_KEY);
+  let sessionOn = false;
+  if(sessionName){
+    const name = sessionName === '1' ? '团长' : sessionName;
+    if(getAdminAccounts().some(function(a){ return String(a.name).toLowerCase() === String(name).toLowerCase(); })){
+      currentAdminName = name;
+      sessionOn = true;
+    }
+  }
+  setAdminUI(sessionOn);
+  renderAll(false);
+}
+init();
+</script>
+</body>
+</html>
