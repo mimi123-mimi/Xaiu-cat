@@ -33,6 +33,52 @@ body{
 button{font-family:inherit;}
 .hidden{display:none!important;}
 
+/* ---------- 云数据库连接状态条 ---------- */
+.cloud-bar{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  flex-wrap:wrap;
+  background:#FFF7EC;
+  border:1px solid #F0C9A4;
+  border-radius:14px;
+  box-shadow:var(--shadow);
+  padding:10px 14px;
+  font-size:13px;
+  margin-top:0;
+}
+.cloud-bar.online{background:#EAF7EF;border-color:#B9E3C9;}
+.cloud-bar.offline{background:#FFF1EE;border-color:#FFC1BC;}
+#cloudBarText{flex:1 1 230px;color:#6F5642;}
+.cloud-bar.online #cloudBarText{color:#25623F;}
+.cloud-bar.offline #cloudBarText{color:#A43034;}
+.cloud-bar-actions{display:flex;gap:8px;flex-wrap:wrap;}
+.cloud-btn{
+  background:#fff;
+  border:1px solid #E0B98F;
+  border-radius:999px;
+  padding:6px 12px;
+  font-size:12px;
+  cursor:pointer;
+  color:#7A4B1B;
+  transition:.2s;
+}
+.cloud-btn:hover{background:#FFEEDC;}
+.cloud-help-steps{margin:10px 0 0;padding-left:20px;display:grid;gap:8px;font-size:13px;line-height:1.7;}
+.cloud-help-steps li::marker{color:var(--orange-deep);font-weight:700;}
+.cloud-code{
+  display:block;
+  background:#F5EADB;
+  border-radius:8px;
+  padding:8px 10px;
+  margin-top:4px;
+  font-family:ui-monospace,SFMono-Regular,Consolas,"Courier New",monospace;
+  font-size:12px;
+  white-space:pre-wrap;
+  word-break:break-all;
+  color:#6A3D10;
+}
+
 /* ---------- 顶部 ---------- */
 .app-header{
   background:linear-gradient(135deg,#FF8C42 0%,#FFA75E 55%,#FFB77C 100%);
@@ -863,6 +909,17 @@ footer{
   </div>
 </header>
 
+<div class="container" style="padding-top:14px;padding-bottom:0;">
+  <div class="cloud-bar" id="cloudBar" style="display:none;">
+    <span id="cloudBarIcon">☁️</span>
+    <span id="cloudBarText">正在连接云数据库…</span>
+    <span class="cloud-bar-actions">
+      <button type="button" id="cloudRetryBtn" class="cloud-btn">重试连接</button>
+      <button type="button" id="cloudHelpBtn" class="cloud-btn">查看开通步骤</button>
+    </span>
+  </div>
+</div>
+
 <main class="container">
 
   <!-- 统计卡片 -->
@@ -1082,6 +1139,48 @@ footer{
 
 <footer>Made with ❤️ for Xaiu猫猫守护团</footer>
 
+<!-- 云数据库开通帮助 -->
+<div class="modal-overlay" id="cloudHelpOverlay">
+  <div class="modal modal-wide">
+    <h3>☁️ 开启多人共用数据（约 5 分钟）</h3>
+    <p class="modal-sub">
+      本页默认把数据只保存在浏览器里，只有你自己能看到。
+      要让大家（手机扫码、别人的电脑）看到同一份数据，需要在腾讯云开发控制台做一次开通，之后所有设备会自动共用。
+      你现有网页上的数据会在第一次连通后自动上传，不会丢失。
+    </p>
+    <ol class="cloud-help-steps">
+      <li>
+        打开腾讯云开发控制台：<a href="https://console.cloud.tencent.com/tcb" target="_blank" rel="noopener">https://console.cloud.tencent.com/tcb</a>，
+        选择云环境：<b>cat-d9g9ifzcyb9ddc70a</b>。
+      </li>
+      <li>左侧「身份认证」→「登录方式」→ 打开「匿名登录」（没有开通按钮就按提示开通）。</li>
+      <li>左侧「安全配置」（或「Web 安全域名」）→ 添加：
+        <span class="cloud-code">https://cute-cat-8db404.netlify.app</span>
+        想在自己电脑测试时，可再加一行：<span class="cloud-code">http://localhost</span>
+      </li>
+      <li>进入「数据库」，新建 3 个集合，名字严格一致（不用加前缀）：
+        <span class="cloud-code">records
+cats
+config</span>
+      </li>
+      <li>分别点进这 3 个集合 →「权限设置」→ 选「自定义安全规则」，清空后粘贴并保存：
+        <span class="cloud-code">{ "read": true, "write": true }</span>
+      </li>
+      <li>如果希望猫咪照片也跨设备显示：进入「云存储」→「权限设置」→ 自定义安全规则粘贴并保存：
+        <span class="cloud-code">{ "read": "auth != null", "write": "auth != null" }</span>
+      </li>
+      <li>回到本页，点击状态条上的「重试连接」。成功后状态会变成绿色「云数据库已连接」。</li>
+    </ol>
+    <p class="modal-note">
+      提示：如果页面仍提示失败，把网页上方红色提示里显示的错误信息（或按 F12 的报错）截图发给我，我再帮你排查。
+    </p>
+    <div class="modal-actions">
+      <button type="button" class="btn ghost" data-close="cloudHelpOverlay">关闭</button>
+      <button type="button" class="btn primary" id="cloudCopyEnvBtn">复制环境 ID</button>
+    </div>
+  </div>
+</div>
+
 <!-- 手机分享 / 二维码 -->
 <div class="modal-overlay" id="shareOverlay">
   <div class="modal share-modal">
@@ -1125,7 +1224,7 @@ footer{
 <div class="modal-overlay" id="pwdOverlay">
   <div class="modal">
     <h3>🔑 修改密码</h3>
-    <p class="modal-sub">新密码将保存在 localStorage，下次登录使用新密码</p>
+    <p class="modal-sub">新密码会自动同步到云数据库，所有设备统一使用新密码登录</p>
     <div class="field">
       <label for="currentPwd">当前密码</label>
       <input type="password" id="currentPwd" autocomplete="current-password" placeholder="请输入当前密码">
@@ -1331,6 +1430,7 @@ footer{
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://static.cloudbase.net/cloudbase-js-sdk/latest/cloudbase.full.js"></script>
 <script>
 'use strict';
 
@@ -1340,6 +1440,12 @@ const BUDGET_KEY = 'monthlyBudget';
 const CATS_KEY = 'catProfiles';
 const ADMINS_KEY = 'adminAccounts';
 const ADMIN_SESSION_KEY = 'catAdminSession';
+const CLOUD_ENV = 'cat-d9g9ifzcyb9ddc70a';
+const CLOUD_CONFIG_KEY = 'catCloudCacheV1';
+const CLOUD_URL_KEY = 'catCloudUrlCacheV1';
+const CLOUD_TOMB_KEY = 'catCloudTombstonesV1';
+const CLOUD_SEEN_KEY = 'catCloudSeenV1';
+const CLOUD_CFG_ID = 'main';
 const DEFAULT_PASSWORD = 'cat2026';
 const CATEGORIES = ['猫粮','罐头','绝育','医疗','义卖','捐款','捐赠','其他'];
 
@@ -1353,6 +1459,21 @@ let budgetAlertShown = false;
 let pieChart = null;
 let lineChart = null;
 let catDraft = null;
+let cloudApp = null;
+let cloudDB = null;
+let cloudOnline = false;
+let cloudPendingLogin = false;
+let cloudConfigCache = loadCloudConfigCache();
+let cloudUrlCache = loadCloudUrlCache();
+let cloudTombstones = loadCloudTombstones();
+let cloudSeen = loadCloudSeen();
+let cloudDirtyRecords = new Set();
+let cloudDirtyCats = new Set();
+let cloudConfigDirty = false;
+let cloudFlushTimer = null;
+let cloudPollTimer = null;
+let cloudFlushing = false;
+const cloudUploaded = {};
 
 /* ---------- 基础工具 ---------- */
 function escapeHtml(value){
@@ -1405,14 +1526,118 @@ function writeSS(key, val){
 function removeSS(key){
   try{ sessionStorage.removeItem(key); }catch(e){}
 }
+/* ---------- 云数据库本地缓存 / 墓碑 ---------- */
+function loadCloudConfigCache(){
+  try{
+    const raw = localStorage.getItem(CLOUD_CONFIG_KEY);
+    if(!raw) return null;
+    const obj = JSON.parse(raw);
+    if(!obj || typeof obj !== 'object') return null;
+    return {
+      admins: Array.isArray(obj.admins) ? obj.admins : [],
+      budget: Object.prototype.hasOwnProperty.call(obj, 'budget') ? obj.budget : null,
+      updatedAt: String(obj.updatedAt || ''),
+      lastConnectedAt: String(obj.lastConnectedAt || '')
+    };
+  }catch(e){ return null; }
+}
+function saveCloudConfigCache(obj){
+  try{
+    localStorage.setItem(CLOUD_CONFIG_KEY, JSON.stringify(obj || cloudConfigCache));
+  }catch(e){}
+}
+function loadCloudUrlCache(){
+  try{
+    const raw = localStorage.getItem(CLOUD_URL_KEY);
+    const obj = raw ? JSON.parse(raw) : {};
+    return (obj && typeof obj === 'object') ? obj : {};
+  }catch(e){ return {}; }
+}
+function saveCloudUrlCache(){
+  try{
+    localStorage.setItem(CLOUD_URL_KEY, JSON.stringify(cloudUrlCache));
+  }catch(e){}
+}
+function loadCloudTombstones(){
+  try{
+    const raw = localStorage.getItem(CLOUD_TOMB_KEY);
+    const obj = raw ? JSON.parse(raw) : {};
+    if(!obj || typeof obj !== 'object') return {records:{}, cats:{}};
+    return {
+      records: (obj.records && typeof obj.records === 'object') ? obj.records : {},
+      cats: (obj.cats && typeof obj.cats === 'object') ? obj.cats : {}
+    };
+  }catch(e){ return {records:{}, cats:{}}; }
+}
+function saveCloudTombstones(){
+  try{
+    localStorage.setItem(CLOUD_TOMB_KEY, JSON.stringify(cloudTombstones));
+  }catch(e){}
+}
+function loadCloudSeen(){
+  try{
+    const raw = localStorage.getItem(CLOUD_SEEN_KEY);
+    const obj = raw ? JSON.parse(raw) : {};
+    if(!obj || typeof obj !== 'object') return {records: new Set(), cats: new Set()};
+    return {
+      records: new Set(Array.isArray(obj.records) ? obj.records : []),
+      cats: new Set(Array.isArray(obj.cats) ? obj.cats : [])
+    };
+  }catch(e){ return {records: new Set(), cats: new Set()}; }
+}
+function saveCloudSeen(){
+  try{
+    localStorage.setItem(CLOUD_SEEN_KEY, JSON.stringify({
+      records: Array.from(cloudSeen.records),
+      cats: Array.from(cloudSeen.cats)
+    }));
+  }catch(e){}
+}
+function markSeen(kind, id){
+  if(!cloudSeen[kind].has(id)){
+    cloudSeen[kind].add(id);
+    saveCloudSeen();
+  }
+}
+function rememberTombstone(kind, id){
+  cloudTombstones[kind][id] = new Date().toISOString();
+  saveCloudTombstones();
+}
+function isTombstoned(kind, id, itemUpdatedAt){
+  const t = cloudTombstones[kind][id];
+  if(!t) return false;
+  if(itemUpdatedAt && String(itemUpdatedAt) > t) return false;
+  return true;
+}
+function clearTombstone(kind, id){
+  if(cloudTombstones[kind][id]){
+    delete cloudTombstones[kind][id];
+    saveCloudTombstones();
+  }
+}
+function cloudNoteHardRemove(kind, id){
+  if(!cloudApp || !id) return;
+  rememberTombstone(kind, id);
+  scheduleCloudSync(500);
+}
 function getAdminAccounts(){
   let list = [];
-  const raw = readLS(ADMINS_KEY);
-  if(raw){
-    try{
-      const parsed = JSON.parse(raw);
-      if(Array.isArray(parsed)) list = parsed;
-    }catch(e){ list = []; }
+  if(cloudConfigCache && Array.isArray(cloudConfigCache.admins) && cloudConfigCache.admins.length){
+    list = cloudConfigCache.admins.map(function(a){
+      return {
+        name: String(a.name || ''),
+        password: String(a.password || ''),
+        createdAt: String(a.createdAt || '')
+      };
+    });
+  }else{
+    const raw = readLS(ADMINS_KEY);
+    if(raw){
+      try{
+        const parsed = JSON.parse(raw);
+        if(Array.isArray(parsed)) list = parsed;
+      }catch(e){ list = []; }
+    }
   }
   if(list.length === 0){
     const legacy = readLS(PASS_KEY);
@@ -1427,6 +1652,15 @@ function getAdminAccounts(){
 }
 function saveAdminAccounts(list){
   writeLS(ADMINS_KEY, JSON.stringify(list));
+  if(cloudConfigCache){
+    cloudConfigCache.admins = list.map(function(a){
+      return {name: String(a.name || ''), password: String(a.password || ''), createdAt: String(a.createdAt || '')};
+    });
+    cloudConfigCache.updatedAt = new Date().toISOString();
+    saveCloudConfigCache(cloudConfigCache);
+    cloudConfigDirty = true;
+    scheduleCloudSync(600);
+  }
 }
 function verifyAdmin(name, password){
   const target = String(name || '').trim();
@@ -1460,10 +1694,26 @@ function removeAdminAccount(name){
   saveAdminAccounts(next);
 }
 function getBudget(){
+  if(cloudConfigCache && Object.prototype.hasOwnProperty.call(cloudConfigCache, 'budget')){
+    const cached = Number(cloudConfigCache.budget);
+    return (isFinite(cached) && cached > 0) ? cached : null;
+  }
   const raw = readLS(BUDGET_KEY);
   if(raw === null || raw === '') return null;
   const val = parseFloat(readLS(BUDGET_KEY));
   return (isFinite(val) && val > 0) ? val : null;
+}
+function setBudgetValue(text){
+  const rawText = text === null || text === undefined ? '' : String(text);
+  writeLS(BUDGET_KEY, rawText);
+  if(cloudConfigCache){
+    const num = parseFloat(rawText);
+    cloudConfigCache.budget = (rawText !== '' && isFinite(num) && num > 0) ? Math.round(num * 100) / 100 : null;
+    cloudConfigCache.updatedAt = new Date().toISOString();
+    saveCloudConfigCache(cloudConfigCache);
+    cloudConfigDirty = true;
+    scheduleCloudSync(600);
+  }
 }
 function normalizeCat(raw){
   if(!raw || typeof raw !== 'object') return null;
@@ -1494,7 +1744,7 @@ function normalizeCat(raw){
       }).filter(Boolean)
     : [];
   return {
-    id: String(raw.id || genId()),
+    id: String(raw.id || raw._id || genId()),
     name: name,
     gender: ['公','母','未知'].indexOf(raw.gender) >= 0 ? raw.gender : '未知',
     vaccine: vaccine,
@@ -1523,6 +1773,10 @@ function loadCats(){
 }
 function saveCats(){
   writeLS(CATS_KEY, JSON.stringify(cats));
+  if(cloudApp){
+    cats.forEach(function(c){ cloudDirtyCats.add(c.id); });
+    scheduleCloudSync();
+  }
 }
 function activeCats(){
   return cats.slice().sort(function(a,b){
@@ -1544,7 +1798,7 @@ function normalizeRecord(raw){
   if(!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
   const category = CATEGORIES.indexOf(raw.category) >= 0 ? raw.category : '其他';
   return {
-    id: String(raw.id || genId()),
+    id: String(raw.id || raw._id || genId()),
     type: type,
     category: category,
     amount: Math.round(amount * 100) / 100,
@@ -1552,6 +1806,7 @@ function normalizeRecord(raw){
     note: String(raw.note || ''),
     date: date,
     createdAt: String(raw.createdAt || new Date().toISOString()),
+    updatedAt: String(raw.updatedAt || raw.createdAt || new Date().toISOString()),
     deleted: !!raw.deleted
   };
 }
@@ -1566,6 +1821,10 @@ function loadRecords(){
 }
 function saveRecords(){
   writeLS(STORAGE_KEY, JSON.stringify(records));
+  if(cloudApp){
+    records.forEach(function(r){ cloudDirtyRecords.add(r.id); });
+    scheduleCloudSync();
+  }
 }
 function activeRecords(){
   return records
@@ -1688,16 +1947,23 @@ function renderCatSummary(){
 
 function renderCats(){
   const list = activeCats();
+  cloudRefreshAllCatPhotos();
+  renderCatsNow(list);
+}
+function renderCatsNow(list){
   $('catArchiveEmpty').hidden = list.length > 0;
   $('catsGrid').innerHTML = list.map(function(c){
     const mainThumbs = (c.photos || []).slice(1).map(function(src){
-      return '<a href="' + src + '" target="_blank" rel="noopener"><img src="' + src + '" alt="' + escapeHtml(c.name) + '" loading="lazy"></a>';
+      const url = cloudPhotoSrc(src);
+      return '<a href="' + url + '" target="_blank" rel="noopener"><img src="' + url + '" alt="' + escapeHtml(c.name) + '" loading="lazy"></a>';
     }).join('');
     const adoptionPhotos = (c.adoptionPhotos || []).map(function(src){
-      return '<a href="' + src + '" target="_blank" rel="noopener"><img src="' + src + '" alt="领养后照片" loading="lazy"></a>';
+      const url = cloudPhotoSrc(src);
+      return '<a href="' + url + '" target="_blank" rel="noopener"><img src="' + url + '" alt="领养后照片" loading="lazy"></a>';
     }).join('');
     const fosterPhotos = (c.fosterPhotos || []).map(function(src){
-      return '<a href="' + src + '" target="_blank" rel="noopener"><img src="' + src + '" alt="寄养照片" loading="lazy"></a>';
+      const url = cloudPhotoSrc(src);
+      return '<a href="' + url + '" target="_blank" rel="noopener"><img src="' + url + '" alt="寄养照片" loading="lazy"></a>';
     }).join('');
     const vaccineText = c.vaccine === '已打'
       ? '已打' + (c.vaccineDoses ? c.vaccineDoses : '?') + '针'
@@ -1716,7 +1982,7 @@ function renderCats(){
     return '<div class="cat-card">' +
       '<div class="cat-cover">' +
         (c.photos && c.photos.length
-          ? '<img src="' + c.photos[0] + '" alt="' + escapeHtml(c.name) + '">'
+          ? '<img src="' + cloudPhotoSrc(c.photos[0]) + '" alt="' + escapeHtml(c.name) + '">'
           : '🐱') +
       '</div>' +
       '<div class="cat-body">' +
@@ -1751,20 +2017,20 @@ function renderCats(){
 function renderCatPhotoBoxes(){
   if(!catDraft) return;
   const mainBoxes = catDraft.photos.map(function(src, i){
-    return '<div class="cat-photo-box"><img src="' + src + '" alt="猫咪照片"><span class="cat-photo-del" data-kind="photos" data-index="' + i + '">×</span></div>';
+    return '<div class="cat-photo-box"><img src="' + cloudPhotoSrc(src) + '" alt="猫咪照片"><span class="cat-photo-del" data-kind="photos" data-index="' + i + '">×</span></div>';
   }).join('');
   $('catPhotoBoxes').innerHTML = mainBoxes +
     '<label class="cat-add-photo" for="catPhotoInput">＋ 添加照片</label>';
 
   const adoptBoxes = catDraft.adoptionPhotos.map(function(src, i){
-    return '<div class="cat-photo-box"><img src="' + src + '" alt="领养后照片"><span class="cat-photo-del" data-kind="adoptionPhotos" data-index="' + i + '">×</span></div>';
+    return '<div class="cat-photo-box"><img src="' + cloudPhotoSrc(src) + '" alt="领养后照片"><span class="cat-photo-del" data-kind="adoptionPhotos" data-index="' + i + '">×</span></div>';
   }).join('');
   $('catAdoptionPhotoBoxes').innerHTML = adoptBoxes +
     '<label class="cat-add-photo" for="catAdoptionPhotoInput">＋ 添加照片</label>';
   $('catAdoptionPhotoArea').style.display = catDraft.adopted ? '' : 'none';
 
   const fosterBoxes = catDraft.fosterPhotos.map(function(src, i){
-    return '<div class="cat-photo-box"><img src="' + src + '" alt="寄养照片"><span class="cat-photo-del" data-kind="fosterPhotos" data-index="' + i + '">×</span></div>';
+    return '<div class="cat-photo-box"><img src="' + cloudPhotoSrc(src) + '" alt="寄养照片"><span class="cat-photo-del" data-kind="fosterPhotos" data-index="' + i + '">×</span></div>';
   }).join('');
   $('catFosterPhotoBoxes').innerHTML = fosterBoxes +
     '<label class="cat-add-photo" for="catFosterPhotoInput">＋ 添加照片</label>';
@@ -1812,7 +2078,25 @@ function openCatEditor(id){
   renderCatPhotoBoxes();
   renderDewormRecords();
   syncCatVaccineUI();
+  cloudRefreshDraftPhotos();
   openOverlay('catEditorOverlay');
+}
+function cloudRefreshDraftPhotos(){
+  if(!catDraft || !cloudApp) return;
+  const ids = [];
+  function addAll(arr){
+    for(const src of (arr || [])){
+      if(isCloudFileId(src) && !cloudUrlCache[src] && ids.indexOf(src) < 0) ids.push(src);
+    }
+  }
+  addAll(catDraft.photos);
+  addAll(catDraft.adoptionPhotos);
+  addAll(catDraft.fosterPhotos);
+  if(ids.length){
+    cloudRefreshCatPhotos(ids).then(function(){
+      if(catDraft) renderCatPhotoBoxes();
+    });
+  }
 }
 
 function processCatFiles(files, kind){
@@ -1954,7 +2238,8 @@ function saveCatDraft(){
 
 function deleteCatDraft(){
   if(!catDraft || !catDraft.id) return;
-  if(!confirm('确定删除 “' + catDraft.name + '” 的档案吗？照片将从网页本地删除。')) return;
+  if(!confirm('确定删除 “' + catDraft.name + '” 的档案吗？删除后所有设备都会同步移除。')) return;
+  cloudNoteHardRemove('cats', catDraft.id);
   cats = cats.filter(function(c){ return c.id !== catDraft.id; });
   saveCats();
   closeOverlay('catEditorOverlay');
@@ -2128,6 +2413,572 @@ function renderCharts(){
   }
 }
 
+/* ---------- 腾讯云开发共用数据（CloudBase） ---------- */
+const CLOUD_BLANK_GIF = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
+function cloudErrorMessage(e){
+  const msg = String((e && (e.message || e.errMsg || e)) || e || '');
+  if(/SDK_LOAD_FAIL/.test(msg)) return 'CloudBase SDK 加载失败，请检查网络后刷新页面';
+  if(/anonymous|匿名登录|Anonymous/i.test(msg) && /disabled|关闭|未开启|not enabled/i.test(msg)) return '请先在云开发控制台开启“匿名登录”';
+  if(/非法来源|安全域名|security domain|domain not|来源不合法|bucket not/i.test(msg)) return '请先在云开发控制台把本网址加入“Web 安全域名”';
+  if(/collection|集合|不存在|not exist|DATABASE_COLLECTION_NOT_EXIST/i.test(msg)) return '数据库集合还未创建（需要 records / cats / config）';
+  if(/permission|权限|forbidden|Forbidden|denied/i.test(msg)) return '数据库或云存储权限还没放开（需要粘贴文中给的安全规则）';
+  if(!msg) return '连接失败';
+  return msg.slice(0, 120);
+}
+function setCloudBar(mode, text){
+  const bar = $('cloudBar');
+  if(!bar) return;
+  bar.className = 'cloud-bar ' + mode;
+  bar.style.display = 'flex';
+  $('cloudBarIcon').textContent = mode === 'online' ? '✅' : (mode === 'connecting' ? '⏳' : '⚠️');
+  $('cloudBarText').textContent = text;
+}
+async function cloudStart(){
+  if(cloudPendingLogin) return;
+  cloudPendingLogin = true;
+  setCloudBar('connecting', '正在连接云数据库…');
+  try{
+    if(typeof cloudbase === 'undefined') throw new Error('SDK_LOAD_FAIL');
+    cloudApp = cloudbase.init({env: CLOUD_ENV});
+    await cloudEnsureLogin();
+    cloudDB = cloudApp.database();
+    cloudOnline = true;
+    await cloudBootstrap();
+    setCloudBar('online', '☁️ 云数据库已连接：收支记录、猫咪档案、预算与管理员账号会在所有设备间自动同步');
+    scheduleCloudPoll();
+  }catch(e){
+    console.error('CloudBase 连接失败：', e);
+    cloudOnline = false;
+    setCloudBar('offline', '⚠️ 云数据库未连接：' + cloudErrorMessage(e) + '。当前数据仍保存在本机，点「查看开通步骤」完成设置后可重试。');
+  }finally{
+    cloudPendingLogin = false;
+  }
+}
+async function cloudEnsureLogin(){
+  const auth = cloudApp.auth();
+  let state = null;
+  try{ state = await auth.getLoginState(); }catch(e){ state = null; }
+  if(state && (state.isAnonymousAuth || state.isAnonymous || state.uid || state.userId)) return;
+  if(auth && typeof auth.anonymousAuthProvider === 'function'){
+    await auth.anonymousAuthProvider().signIn();
+    return;
+  }
+  if(auth && typeof auth.signInAnonymously === 'function'){
+    await auth.signInAnonymously();
+    return;
+  }
+  if(auth && typeof auth.signIn === 'function'){
+    await auth.signIn();
+    return;
+  }
+  throw new Error('当前 CloudBase SDK 不支持匿名登录，请刷新页面重试');
+}
+async function cloudDocGet(colName, id){
+  try{
+    const res = await cloudDB.collection(colName).doc(id).get();
+    return (res && res.data) || null;
+  }catch(e){
+    const msg = String((e && (e.message || e.errMsg)) || '');
+    if(/not.?exist|不存在|404|DATABASE_DOCUMENT_NOT_EXIST/i.test(msg)) return null;
+    throw e;
+  }
+}
+async function cloudDocSet(colName, id, obj){
+  await cloudDB.collection(colName).doc(id).set(obj);
+}
+async function cloudDocRemove(colName, id){
+  try{
+    await cloudDB.collection(colName).doc(id).remove();
+  }catch(e){
+    const msg = String((e && (e.message || e.errMsg)) || '');
+    if(!/not.?exist|不存在|404|DATABASE_DOCUMENT_NOT_EXIST/i.test(msg)) throw e;
+  }
+}
+async function cloudColAll(colName){
+  const out = [];
+  let skip = 0;
+  while(skip < 20000){
+    const res = await cloudDB.collection(colName).skip(skip).limit(100).get();
+    const data = (res && Array.isArray(res.data)) ? res.data : [];
+    for(const d of data){
+      if(d && typeof d === 'object') out.push(d);
+    }
+    if(data.length < 100) break;
+    skip += data.length;
+  }
+  return out;
+}
+function cloudRecordPayload(r){
+  const now = new Date().toISOString();
+  return {
+    id: String(r.id || ''),
+    type: r.type,
+    category: r.category,
+    amount: Math.round((Number(r.amount) || 0) * 100) / 100,
+    donor: String(r.donor || ''),
+    note: String(r.note || ''),
+    date: String(r.date || ''),
+    createdAt: String(r.createdAt || now),
+    updatedAt: String(r.updatedAt || r.createdAt || now),
+    deleted: !!r.deleted
+  };
+}
+function isCloudFileId(src){
+  return typeof src === 'string' && src.indexOf('cloud://') === 0;
+}
+function dataUrlToBlob(dataUrl){
+  const parts = String(dataUrl).split(',');
+  const meta = parts[0] || '';
+  const mime = (meta.match(/data:([^;]+)/) || [])[1] || 'image/jpeg';
+  const bin = atob(parts[1] || '');
+  const bytes = new Uint8Array(bin.length);
+  for(let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new Blob([bytes], {type: mime});
+}
+async function cloudUploadDataUrl(dataUrl, folder){
+  const blob = dataUrlToBlob(dataUrl);
+  const path = folder + '/' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8) + '.jpg';
+  if(typeof cloudApp.uploadFile === 'function'){
+    const res = await cloudApp.uploadFile({cloudPath: path, filePath: blob});
+    const fid = res && (res.fileID || res.fileId ||
+      (res.data && (res.data.fileID || res.data.fileId || res.data.id)));
+    if(fid) return String(fid);
+  }
+  if(cloudApp.storage && typeof cloudApp.storage.from === 'function'){
+    const out = await cloudApp.storage.from().upload(path, blob, {contentType: 'image/jpeg'});
+    if(!out.error && out.data){
+      const fid = out.data.id || out.data.fullPath || (isCloudFileId(out.data.path) ? out.data.path : '');
+      if(fid) return String(fid);
+    }
+  }
+  throw new Error('照片上传失败：请确认已开启匿名登录和云存储权限');
+}
+async function cloudCatPayload(c){
+  const folder = 'cats/' + encodeURIComponent(String(c.id || 'cat'));
+  async function mapPhotos(arr){
+    const out = [];
+    for(const src of (arr || [])){
+      if(!src) continue;
+      if(isCloudFileId(src)){ out.push(src); continue; }
+      if(cloudUploaded[src]){ out.push(cloudUploaded[src]); continue; }
+      const fid = await cloudUploadDataUrl(src, folder);
+      cloudUploaded[src] = fid;
+      out.push(fid);
+    }
+    return out;
+  }
+  const now = new Date().toISOString();
+  return {
+    id: String(c.id || ''),
+    name: String(c.name || ''),
+    gender: String(c.gender || '未知'),
+    vaccine: String(c.vaccine || '未知'),
+    vaccineDoses: c.vaccineDoses || null,
+    neutered: String(c.neutered || '未知'),
+    adopted: !!c.adopted,
+    fostered: !!c.fostered,
+    fosterAddress: String(c.fosterAddress || ''),
+    note: String(c.note || ''),
+    dewormRecords: Array.isArray(c.dewormRecords) ? c.dewormRecords : [],
+    photos: await mapPhotos(c.photos),
+    adoptionPhotos: await mapPhotos(c.adoptionPhotos),
+    fosterPhotos: await mapPhotos(c.fosterPhotos),
+    createdAt: String(c.createdAt || now),
+    updatedAt: String(c.updatedAt || c.createdAt || now)
+  };
+}
+function cloudHasCloudPhotos(c){
+  function any(arr){ return (arr || []).some(isCloudFileId); }
+  return any(c.photos) || any(c.adoptionPhotos) || any(c.fosterPhotos);
+}
+function localHasDataPhotos(c){
+  function any(arr){
+    return (arr || []).some(function(src){
+      return typeof src === 'string' && !isCloudFileId(src) && src.indexOf('data:') === 0;
+    });
+  }
+  return any(c.photos) || any(c.adoptionPhotos) || any(c.fosterPhotos);
+}
+async function flushCloud(){
+  if(!cloudApp || !cloudOnline || cloudFlushing) return;
+  cloudFlushing = true;
+  try{
+    const recIds = Array.from(cloudDirtyRecords);
+    for(const id of recIds){
+      const found = findRecord(id);
+      if(found){
+        await cloudDocSet('records', id, cloudRecordPayload(found.record));
+      }else{
+        await cloudDocRemove('records', id);
+      }
+      markSeen('records', id);
+      cloudDirtyRecords.delete(id);
+    }
+    const tomRecIds = Object.keys(cloudTombstones.records);
+    for(const id of tomRecIds){
+      const found = findRecord(id);
+      if(found && String(found.record.updatedAt) > cloudTombstones.records[id]){
+        clearTombstone('records', id);
+        continue;
+      }
+      await cloudDocRemove('records', id);
+      clearTombstone('records', id);
+    }
+    const catIds = Array.from(cloudDirtyCats);
+    for(const id of catIds){
+      const found = cats.find(function(c){ return c.id === id; });
+      if(found){
+        const payload = await cloudCatPayload(found);
+        await cloudDocSet('cats', id, payload);
+      }else{
+        await cloudDocRemove('cats', id);
+      }
+      markSeen('cats', id);
+      cloudDirtyCats.delete(id);
+    }
+    const tomCatIds = Object.keys(cloudTombstones.cats);
+    for(const id of tomCatIds){
+      const found = cats.find(function(c){ return c.id === id; });
+      if(found && String(found.updatedAt) > cloudTombstones.cats[id]){
+        clearTombstone('cats', id);
+        continue;
+      }
+      await cloudDocRemove('cats', id);
+      clearTombstone('cats', id);
+    }
+    if(cloudConfigDirty && cloudConfigCache){
+      const cfg = {
+        budget: getBudget(),
+        admins: getAdminAccounts().map(function(a){
+          return {name: String(a.name || ''), password: String(a.password || ''), createdAt: String(a.createdAt || '')};
+        }),
+        updatedAt: new Date().toISOString()
+      };
+      await cloudDocSet('config', CLOUD_CFG_ID, cfg);
+      cloudConfigCache.updatedAt = cfg.updatedAt;
+      saveCloudConfigCache(cloudConfigCache);
+      cloudConfigDirty = false;
+    }
+  }catch(e){
+    console.error('云同步失败：', e);
+    cloudOnline = false;
+    setCloudBar('offline', '⚠️ 云同步暂时失败：' + cloudErrorMessage(e) + '。数据已安全保存在本机，可稍后点「重试连接」。');
+  }finally{
+    cloudFlushing = false;
+  }
+}
+function scheduleCloudSync(delay){
+  if(!cloudApp) return;
+  clearTimeout(cloudFlushTimer);
+  cloudFlushTimer = setTimeout(function(){ flushCloud(); }, delay === undefined ? 1000 : delay);
+}
+function normalizeCloudAdmins(list){
+  return (Array.isArray(list) ? list : []).map(function(a){
+    return {
+      name: String(a.name || ''),
+      password: String(a.password || ''),
+      createdAt: String(a.createdAt || '')
+    };
+  }).filter(function(a){ return a.name; });
+}
+function cloudAdoptConfig(cfg, firstSeed){
+  if(!cfg || typeof cfg !== 'object') return;
+  const admins = normalizeCloudAdmins(cfg.admins);
+  const rawBudget = Object.prototype.hasOwnProperty.call(cfg, 'budget') ? cfg.budget : null;
+  const budgetNum = rawBudget === null || rawBudget === '' ? null : Number(rawBudget);
+  const budget = (isFinite(budgetNum) && budgetNum > 0) ? Math.round(budgetNum * 100) / 100 : null;
+  const updatedAt = String(cfg.updatedAt || new Date().toISOString());
+  if(cloudConfigCache &&
+    cloudConfigCache.updatedAt === updatedAt &&
+    JSON.stringify(cloudConfigCache.admins) === JSON.stringify(admins) &&
+    Number(cloudConfigCache.budget) === Number(budget)){
+    return;
+  }
+  const oldName = currentAdminName;
+  cloudConfigCache = {
+    admins: admins,
+    budget: budget,
+    updatedAt: updatedAt,
+    lastConnectedAt: new Date().toISOString()
+  };
+  saveCloudConfigCache(cloudConfigCache);
+  writeLS(ADMINS_KEY, JSON.stringify(admins));
+  writeLS(BUDGET_KEY, budget === null ? '' : String(budget));
+  if(adminLoggedIn && oldName && !admins.some(function(a){
+    return String(a.name).toLowerCase() === String(oldName).toLowerCase();
+  })){
+    removeSS(ADMIN_SESSION_KEY);
+    currentAdminName = '';
+    adminLoggedIn = false;
+    setAdminUI(false);
+  }
+  if(!firstSeed){
+    const budgetInput = $('budgetInput');
+    if(budgetInput) budgetInput.value = budget === null ? '' : budget;
+    renderAll(false);
+  }
+}
+function mergeCloudRecords(cloudItems){
+  let changed = false;
+  const localById = {};
+  records.forEach(function(r){ localById[r.id] = r; });
+  const cloudIds = {};
+  for(const raw of cloudItems){
+    const rec = normalizeRecord(raw);
+    if(!rec) continue;
+    cloudIds[rec.id] = rec;
+    if(isTombstoned('records', rec.id, rec.updatedAt)) continue;
+    markSeen('records', rec.id);
+    const cur = localById[rec.id];
+    if(!cur){
+      records.push(rec);
+      localById[rec.id] = rec;
+      changed = true;
+    }else if(String(rec.updatedAt) > String(cur.updatedAt)){
+      const idx = records.findIndex(function(r){ return r.id === rec.id; });
+      if(idx >= 0) records[idx] = rec;
+      localById[rec.id] = rec;
+      changed = true;
+    }else if(String(cur.updatedAt) > String(rec.updatedAt)){
+      cloudDirtyRecords.add(cur.id);
+    }
+  }
+  records = records.filter(function(r){
+    if(cloudIds[r.id]) return true;
+    if(cloudSeen.records.has(r.id)){
+      changed = true;
+      return false;
+    }
+    cloudDirtyRecords.add(r.id);
+    return true;
+  });
+  for(const id of Object.keys(cloudTombstones.records)){
+    const cloudItem = cloudIds[id];
+    const t = cloudTombstones.records[id];
+    if(cloudItem && String(cloudItem.updatedAt) > t){
+      clearTombstone('records', id);
+    }
+  }
+  if(changed){
+    writeLS(STORAGE_KEY, JSON.stringify(records));
+    renderAll(false);
+  }
+}
+function mergeCloudCats(cloudItems){
+  let changed = false;
+  const localById = {};
+  cats.forEach(function(c){ localById[c.id] = c; });
+  const cloudIds = {};
+  for(const raw of cloudItems){
+    const cat = normalizeCat(raw);
+    if(!cat) continue;
+    cloudIds[cat.id] = cat;
+    if(isTombstoned('cats', cat.id, cat.updatedAt)) continue;
+    markSeen('cats', cat.id);
+    const cur = localById[cat.id];
+    if(!cur){
+      cats.push(cat);
+      localById[cat.id] = cat;
+      changed = true;
+    }else if(String(cat.updatedAt) > String(cur.updatedAt)){
+      const idx = cats.findIndex(function(c){ return c.id === cat.id; });
+      if(idx >= 0) cats[idx] = cat;
+      localById[cat.id] = cat;
+      changed = true;
+    }else if(String(cat.updatedAt) === String(cur.updatedAt) &&
+      cloudHasCloudPhotos(cat) && localHasDataPhotos(cur)){
+      const idx = cats.findIndex(function(c){ return c.id === cat.id; });
+      if(idx >= 0) cats[idx] = cat;
+      localById[cat.id] = cat;
+      changed = true;
+    }else if(String(cur.updatedAt) > String(cat.updatedAt)){
+      cloudDirtyCats.add(cur.id);
+    }
+  }
+  cats = cats.filter(function(c){
+    if(cloudIds[c.id]) return true;
+    if(cloudSeen.cats.has(c.id)){
+      changed = true;
+      return false;
+    }
+    cloudDirtyCats.add(c.id);
+    return true;
+  });
+  for(const id of Object.keys(cloudTombstones.cats)){
+    const cloudItem = cloudIds[id];
+    const t = cloudTombstones.cats[id];
+    if(cloudItem && String(cloudItem.updatedAt) > t){
+      clearTombstone('cats', id);
+    }
+  }
+  if(changed){
+    writeLS(CATS_KEY, JSON.stringify(cats));
+    renderAll(false);
+  }
+}
+async function cloudBootstrap(){
+  const cfg = await cloudDocGet('config', CLOUD_CFG_ID);
+  if(!cfg){
+    const now = new Date().toISOString();
+    for(const r of records){
+      await cloudDocSet('records', r.id, cloudRecordPayload(r));
+      markSeen('records', r.id);
+    }
+    let photoFail = 0;
+    for(const c of cats){
+      try{
+        const payload = await cloudCatPayload(c);
+        await cloudDocSet('cats', c.id, payload);
+        markSeen('cats', c.id);
+      }catch(e){
+        photoFail++;
+        cloudDirtyCats.add(c.id);
+        console.warn('猫咪「' + c.name + '」照片上传失败，稍后重试：', e);
+      }
+    }
+    const cfgObj = {
+      budget: getBudget(),
+      admins: getAdminAccounts().map(function(a){
+        return {name: String(a.name || ''), password: String(a.password || ''), createdAt: String(a.createdAt || '')};
+      }),
+      updatedAt: now
+    };
+    await cloudDocSet('config', CLOUD_CFG_ID, cfgObj);
+    cloudAdoptConfig(cfgObj, true);
+    if(photoFail){
+      setCloudBar('online', '☁️ 云数据库已连接（' + photoFail + ' 只猫咪的照片还需上传，请在云存储权限设置好后重新保存该猫咪档案）');
+    }
+    return;
+  }
+  cloudAdoptConfig(cfg, false);
+  const [cloudRecords, cloudCats] = await Promise.all([
+    cloudColAll('records'),
+    cloudColAll('cats')
+  ]);
+  mergeCloudRecords(cloudRecords);
+  mergeCloudCats(cloudCats);
+  if(cloudDirtyRecords.size || cloudDirtyCats.size || cloudConfigDirty){
+    await flushCloud();
+  }
+}
+let cloudPhotoPromise = null;
+function cloudCollectPendingPhotoIds(){
+  const list = activeCats();
+  const ids = [];
+  const now = Date.now();
+  for(const key of Object.keys(cloudUrlCache)){
+    if(cloudUrlCache[key].exp <= now) delete cloudUrlCache[key];
+  }
+  function addAll(arr){
+    for(const src of (arr || [])){
+      if(isCloudFileId(src) && !cloudUrlCache[src] && ids.indexOf(src) < 0) ids.push(src);
+    }
+  }
+  list.forEach(function(c){
+    addAll(c.photos);
+    addAll(c.adoptionPhotos);
+    addAll(c.fosterPhotos);
+  });
+  return ids;
+}
+async function cloudResolvePhotoUrls(fileIds){
+  const ids = [];
+  (fileIds || []).forEach(function(id){
+    if(ids.indexOf(id) < 0) ids.push(id);
+  });
+  const map = {};
+  if(!ids.length) return map;
+  try{
+    if(typeof cloudApp.getTempFileURL === 'function'){
+      const res = await cloudApp.getTempFileURL({fileList: ids});
+      const arr = (res && res.fileList) || [];
+      arr.forEach(function(item){
+        const fid = item && (item.fileID || item.fileId || item.id);
+        const url = item && (item.tempFileURL || item.tempFileUrl || item.url);
+        if(fid && url) map[fid] = url;
+      });
+    }
+    if(cloudApp.storage && typeof cloudApp.storage.from === 'function'){
+      const out = await cloudApp.storage.from().createSignedUrls(ids, 7200);
+      if(!out.error && Array.isArray(out.data)){
+        out.data.forEach(function(item, i){
+          if(item && item.signedUrl && ids[i]) map[ids[i]] = item.signedUrl;
+        });
+      }
+    }
+  }catch(e){
+    console.warn('云端照片地址获取失败：', e);
+  }
+  return map;
+}
+function cloudRefreshCatPhotos(ids){
+  if(cloudPhotoPromise) return cloudPhotoPromise;
+  cloudPhotoPromise = cloudResolvePhotoUrls(ids).then(function(map){
+    let changed = false;
+    for(const fid of Object.keys(map)){
+      if(!cloudUrlCache[fid]){
+        cloudUrlCache[fid] = {url: map[fid], exp: Date.now() + 7200 * 1000};
+        changed = true;
+      }
+    }
+    if(changed){
+      saveCloudUrlCache();
+      renderCats();
+    }
+  }).catch(function(){}).finally(function(){
+    cloudPhotoPromise = null;
+  });
+  return cloudPhotoPromise;
+}
+function cloudPhotoSrc(src){
+  if(!isCloudFileId(src)) return src || CLOUD_BLANK_GIF;
+  const item = cloudUrlCache[src];
+  if(item && item.exp > Date.now()) return item.url;
+  return CLOUD_BLANK_GIF;
+}
+function cloudRefreshAllCatPhotos(){
+  const ids = cloudCollectPendingPhotoIds();
+  if(ids.length) cloudRefreshCatPhotos(ids);
+}
+function scheduleCloudPoll(){
+  clearInterval(cloudPollTimer);
+  cloudPollTimer = setInterval(function(){
+    if(!cloudOnline || cloudPendingLogin || document.hidden) return;
+    cloudPoll();
+  }, 20000);
+}
+async function cloudPoll(){
+  try{
+    if(document.querySelector('.modal-overlay.open')) return;
+    if(cloudDirtyRecords.size || cloudDirtyCats.size || cloudConfigDirty){
+      await flushCloud();
+    }
+    const cfg = await cloudDocGet('config', CLOUD_CFG_ID);
+    if(cfg) cloudAdoptConfig(cfg, false);
+    const [cloudRecords, cloudCats] = await Promise.all([
+      cloudColAll('records'),
+      cloudColAll('cats')
+    ]);
+    mergeCloudRecords(cloudRecords);
+    mergeCloudCats(cloudCats);
+    cloudRefreshAllCatPhotos();
+  }catch(e){
+    console.warn('后台数据同步失败（稍后自动重试）：', e);
+  }
+}
+function copyCloudEnv(){
+  const text = CLOUD_ENV;
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(function(){
+      showToast('环境 ID 已复制');
+    }).catch(function(){
+      prompt('请手动复制环境 ID：', text);
+    });
+  }else{
+    prompt('请手动复制环境 ID：', text);
+  }
+}
+
 /* ---------- 记录列表 ---------- */
 function renderRecords(){
   const list = activeRecords();
@@ -2206,6 +3057,7 @@ function addRecord(){
     return;
   }
 
+  const now = new Date().toISOString();
   records.push({
     id: genId(),
     type: type,
@@ -2214,7 +3066,8 @@ function addRecord(){
     donor: donor,
     note: note,
     date: date,
-    createdAt: new Date().toISOString(),
+    createdAt: now,
+    updatedAt: now,
     deleted: false
   });
   saveRecords();
@@ -2232,6 +3085,7 @@ function softDeleteRecord(id){
   const found = findRecord(id);
   if(!found) return;
   found.record.deleted = true;
+  found.record.updatedAt = new Date().toISOString();
   selectedIds.delete(id);
   saveRecords();
   renderAll(false);
@@ -2242,6 +3096,7 @@ function restoreRecord(id){
   const found = findRecord(id);
   if(!found) return;
   found.record.deleted = false;
+  found.record.updatedAt = new Date().toISOString();
   saveRecords();
   renderAll(false);
   renderRecycleList();
@@ -2252,6 +3107,7 @@ function deleteForever(id){
   const found = findRecord(id);
   if(!found) return;
   if(!confirm('确定彻底删除这条记录吗？该操作不可恢复。')) return;
+  cloudNoteHardRemove('records', id);
   records.splice(found.index, 1);
   saveRecords();
   renderAll(false);
@@ -2654,6 +3510,14 @@ function renderAll(notifyBudget){
 function bindEvents(){
   $('shareBtn').addEventListener('click', openShareModal);
   $('copyShareUrlBtn').addEventListener('click', copyShareUrl);
+  $('cloudRetryBtn').addEventListener('click', function(){
+    cloudOnline = false;
+    cloudStart();
+  });
+  $('cloudHelpBtn').addEventListener('click', function(){
+    openOverlay('cloudHelpOverlay');
+  });
+  $('cloudCopyEnvBtn').addEventListener('click', copyCloudEnv);
 
   $('ledgerForm').addEventListener('submit', function(e){
     e.preventDefault();
@@ -2687,7 +3551,7 @@ function bindEvents(){
   $('budgetSaveBtn').addEventListener('click', function(){
     const rawValue = $('budgetInput').value.trim();
     if(rawValue === ''){
-      writeLS(BUDGET_KEY, '');
+      setBudgetValue('');
       renderAll(false);
       showToast('已清除本月预算（不填即隐藏）');
       return;
@@ -2697,7 +3561,7 @@ function bindEvents(){
       alert('请输入大于 0 的预算金额');
       return;
     }
-    writeLS(BUDGET_KEY, String(Math.round(val*100)/100));
+    setBudgetValue(String(Math.round(val*100)/100));
     renderAll(true);
     showToast('本月预算已更新为 ' + formatMoney(val));
   });
@@ -2787,7 +3651,8 @@ function bindEvents(){
     const delBtn = e.target.closest('.cat-del-btn');
     if(delBtn){
       const cat = cats.find(function(c){ return c.id === delBtn.dataset.catId; });
-      if(cat && confirm('确定删除 “' + cat.name + '” 的档案吗？照片将从网页本地删除。')){
+      if(cat && confirm('确定删除 “' + cat.name + '” 的档案吗？删除后所有设备都会同步移除。')){
+        cloudNoteHardRemove('cats', cat.id);
         cats = cats.filter(function(c){ return c.id !== cat.id; });
         saveCats();
         renderAll(false);
@@ -2872,7 +3737,7 @@ function bindEvents(){
 
   document.addEventListener('keydown', function(e){
     if(e.key === 'Escape'){
-      ['shareOverlay','loginOverlay','pwdOverlay','recycleOverlay','receiptOverlay','adminAccountsOverlay','renameOverlay','catEditorOverlay'].forEach(function(id){
+      ['cloudHelpOverlay','shareOverlay','loginOverlay','pwdOverlay','recycleOverlay','receiptOverlay','adminAccountsOverlay','renameOverlay','catEditorOverlay'].forEach(function(id){
         if($(id).classList.contains('open')) closeOverlay(id);
       });
     }
@@ -2898,6 +3763,7 @@ function init(){
   renderAll(false);
 }
 init();
+cloudStart();
 </script>
 </body>
 </html>
