@@ -916,6 +916,7 @@ footer{
     <span class="cloud-bar-actions">
       <button type="button" id="cloudRetryBtn" class="cloud-btn">重试连接</button>
       <button type="button" id="cloudHelpBtn" class="cloud-btn">查看开通步骤</button>
+      <button type="button" id="cloudSetupBtn" class="cloud-btn">⚙️ 填 Key</button>
     </span>
   </div>
 </div>
@@ -1139,44 +1140,91 @@ footer{
 
 <footer>Made with ❤️ for Xaiu猫猫守护团</footer>
 
-<!-- 云数据库开通帮助 -->
+<!-- 连接共用数据（Supabase）配置 -->
+<div class="modal-overlay" id="cloudSetupOverlay">
+  <div class="modal">
+    <h3>🔑 连接共用数据（Supabase）</h3>
+    <p class="modal-sub">
+      在 <b>supabase.com</b> → 你的项目 → Settings → API 里复制这两项（这是公开信息，不是密码）。
+      粘贴后点「保存并连接」，之后所有设备会自动共用同一份数据。
+    </p>
+    <div class="field">
+      <label for="supUrlInput">Project URL</label>
+      <input type="text" id="supUrlInput" placeholder="https://xxxxxxxx.supabase.co" autocomplete="off">
+    </div>
+    <div class="field">
+      <label for="supKeyInput">anon public key</label>
+      <input type="text" id="supKeyInput" placeholder="eyJhbGciOi...（一长串）" autocomplete="off">
+    </div>
+    <p class="modal-error" id="cloudSetupError"></p>
+    <div class="modal-actions">
+      <button type="button" class="btn ghost" data-close="cloudSetupOverlay">取消</button>
+      <button type="button" class="btn primary" id="cloudConnectBtn">保存并连接</button>
+    </div>
+  </div>
+</div>
+
+<!-- Supabase 开通帮助 -->
 <div class="modal-overlay" id="cloudHelpOverlay">
   <div class="modal modal-wide">
     <h3>☁️ 开启多人共用数据（约 5 分钟）</h3>
     <p class="modal-sub">
-      本页默认把数据只保存在浏览器里，只有你自己能看到。
-      要让大家（手机扫码、别人的电脑）看到同一份数据，需要在腾讯云开发控制台做一次开通，之后所有设备会自动共用。
-      你现有网页上的数据会在第一次连通后自动上传，不会丢失。
+      本页默认只把数据保存在浏览器里。要让手机扫码、别人的电脑看到同一份数据，用免费的
+      <b>Supabase</b> 开通一次即可，之后所有设备自动共用。你现有数据在首次连通后会自动上传，不会丢。
     </p>
     <ol class="cloud-help-steps">
-      <li>
-        打开腾讯云开发控制台：<a href="https://console.cloud.tencent.com/tcb" target="_blank" rel="noopener">https://console.cloud.tencent.com/tcb</a>，
-        选择云环境：<b>cat-d9g9ifzcyb9ddc70a</b>。
-      </li>
-      <li>左侧「身份认证」→「登录方式」→ 打开「匿名登录」（没有开通按钮就按提示开通）。</li>
-      <li>左侧「安全配置」（或「Web 安全域名」）→ 添加：
-        <span class="cloud-code">https://cute-cat-8db404.netlify.app</span>
-        想在自己电脑测试时，可再加一行：<span class="cloud-code">http://localhost</span>
-      </li>
-      <li>进入「数据库」，新建 3 个集合，名字严格一致（不用加前缀）：
-        <span class="cloud-code">records
-cats
-config</span>
-      </li>
-      <li>分别点进这 3 个集合 →「权限设置」→ 选「自定义安全规则」，清空后粘贴并保存：
-        <span class="cloud-code">{ "read": true, "write": true }</span>
-      </li>
-      <li>如果希望猫咪照片也跨设备显示：进入「云存储」→「权限设置」→ 自定义安全规则粘贴并保存：
-        <span class="cloud-code">{ "read": "auth != null", "write": "auth != null" }</span>
-      </li>
-      <li>回到本页，点击状态条上的「重试连接」。成功后状态会变成绿色「云数据库已连接」。</li>
+      <li>打开 <a href="https://supabase.com" target="_blank" rel="noopener">supabase.com</a>，用邮箱免费注册（无需验证即可用）。</li>
+      <li>点「New project」，随便起名，区域选 <b>Singapore</b>，设一个数据库密码，等约 1 分钟创建完成。</li>
+      <li>进入项目 → 左下角 <b>Settings → API</b>，复制 <b>Project URL</b> 和 <b>anon public key</b>。</li>
+      <li>打开 <b>SQL Editor</b>，把下面这段 SQL 粘进去，点右上角 <b>Run</b>（运行一次即可，重复运行也没关系）：</li>
+    </ol>
+    <pre class="cloud-code" style="white-space:pre-wrap;max-height:240px;overflow:auto;">-- 建表（可重复运行）
+create table if not exists public.records (
+  id text primary key, type text, category text, amount numeric,
+  donor text, note text, date text,
+  "createdAt" text, "updatedAt" text, deleted boolean
+);
+create table if not exists public.cats (
+  id text primary key, name text, gender text, vaccine text,
+  "vaccineDoses" integer, neutered text, adopted boolean, fostered boolean,
+  "fosterAddress" text, note text, "dewormRecords" jsonb,
+  photos jsonb, "adoptionPhotos" jsonb, "fosterPhotos" jsonb,
+  "createdAt" text, "updatedAt" text
+);
+create table if not exists public.config (
+  id text primary key, payload jsonb, "updatedAt" text
+);
+-- 开放网页读写权限（RLS）
+alter table public.records enable row level security;
+alter table public.cats enable row level security;
+alter table public.config enable row level security;
+drop policy if exists "anon all records" on public.records;
+drop policy if exists "anon all cats" on public.cats;
+drop policy if exists "anon all config" on public.config;
+create policy "anon all records" on public.records for all using (true) with check (true);
+create policy "anon all cats" on public.cats for all using (true) with check (true);
+create policy "anon all config" on public.config for all using (true) with check (true);
+-- 猫咪照片桶
+insert into storage.buckets (id, name, public) values ('cats','cats', true)
+  on conflict (id) do update set public = true;
+drop policy if exists "anon read cats" on storage.objects;
+drop policy if exists "anon insert cats" on storage.objects;
+drop policy if exists "anon update cats" on storage.objects;
+drop policy if exists "anon delete cats" on storage.objects;
+create policy "anon read cats" on storage.objects for select using (bucket_id = 'cats');
+create policy "anon insert cats" on storage.objects for insert with check (bucket_id = 'cats');
+create policy "anon update cats" on storage.objects for update using (bucket_id = 'cats');
+create policy "anon delete cats" on storage.objects for delete using (bucket_id = 'cats');</pre>
+    <ol class="cloud-help-steps" start="5">
+      <li>点击网页状态条上的「⚙️ 填 Key」，粘贴第 3 步复制好的两项，点「保存并连接」。</li>
+      <li>成功后状态条变绿色「☁️ 已连接 Supabase」。之后把这个 index.html 上传到任何地方（Netlify／服务器），大家看到的都是同一份数据。</li>
     </ol>
     <p class="modal-note">
-      提示：如果页面仍提示失败，把网页上方红色提示里显示的错误信息（或按 F12 的报错）截图发给我，我再帮你排查。
+      提示：如果仍失败，把红色提示里的具体报错发我，我再帮你排查。照片会自动存进 Supabase 的 Storage（桶名 cats，公开可读）。
     </p>
     <div class="modal-actions">
       <button type="button" class="btn ghost" data-close="cloudHelpOverlay">关闭</button>
-      <button type="button" class="btn primary" id="cloudCopyEnvBtn">复制环境 ID</button>
+      <button type="button" class="btn primary" id="cloudCopyEnvBtn">复制 Supabase 地址</button>
     </div>
   </div>
 </div>
@@ -1430,7 +1478,6 @@ config</span>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-<script src="https://static.cloudbase.net/cloudbase-js-sdk/latest/cloudbase.full.js"></script>
 <script>
 'use strict';
 
@@ -1440,7 +1487,16 @@ const BUDGET_KEY = 'monthlyBudget';
 const CATS_KEY = 'catProfiles';
 const ADMINS_KEY = 'adminAccounts';
 const ADMIN_SESSION_KEY = 'catAdminSession';
-const CLOUD_ENV = 'cat-d9g9ifzcyb9ddc70a';
+/*
+  ========== Supabase 共用数据 ==========
+  ① 到 https://supabase.com 免费注册，新建一个项目
+  ② 项目 → Settings → API，复制 Project URL 和 anon public key
+  ③ 把下面两行占位符换成你的（保存后重新发布到 Netlify，所有设备就共用同一份数据）
+  也可以不改文件：打开网页后点顶栏「⚙️ 填 Key」，粘贴后自动保存到本机。
+*/
+const SUPABASE_URL = 'https://knkhhizbvyxolhyzsoqm.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_R9VdRpKpZTJlnx6UvBvqKg_KosSuaBB';
+const SUPABASE_STORAGE_BUCKET = 'cats';
 const CLOUD_CONFIG_KEY = 'catCloudCacheV1';
 const CLOUD_URL_KEY = 'catCloudUrlCacheV1';
 const CLOUD_TOMB_KEY = 'catCloudTombstonesV1';
@@ -2413,15 +2469,14 @@ function renderCharts(){
   }
 }
 
-/* ---------- 腾讯云开发共用数据（CloudBase） ---------- */
+/* ---------- Supabase 共用数据 ---------- */
 const CLOUD_BLANK_GIF = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
 function cloudErrorMessage(e){
   const msg = String((e && (e.message || e.errMsg || e)) || e || '');
-  if(/SDK_LOAD_FAIL/.test(msg)) return 'CloudBase SDK 加载失败，请检查网络后刷新页面';
-  if(/anonymous|匿名登录|Anonymous/i.test(msg) && /disabled|关闭|未开启|not enabled/i.test(msg)) return '请先在云开发控制台开启“匿名登录”';
-  if(/非法来源|安全域名|security domain|domain not|来源不合法|bucket not/i.test(msg)) return '请先在云开发控制台把本网址加入“Web 安全域名”';
-  if(/collection|集合|不存在|not exist|DATABASE_COLLECTION_NOT_EXIST/i.test(msg)) return '数据库集合还未创建（需要 records / cats / config）';
-  if(/permission|权限|forbidden|Forbidden|denied/i.test(msg)) return '数据库或云存储权限还没放开（需要粘贴文中给的安全规则）';
+  if(/could not find.*table|relation .* does not exist|PGRST205|does not exist/i.test(msg)) return '数据表还没有建：请照「查看开通步骤」里的 SQL，在 Supabase 的 SQL 编辑器里运行一次';
+  if(/JWT|apikey|invalid key|invalid apikey|API key|401|unauthorized|not authorized/i.test(msg)) return 'Supabase 地址或 Key 不对，请检查 Settings → API 里的 Project URL 和 anon public key';
+  if(/permission|权限|forbidden|denied|policy|row-level security|RLS/i.test(msg)) return 'Supabase 表的权限（RLS 策略）没设好：「查看开通步骤」里的 SQL 已包含它们，运行一次即可';
+  if(/failed to fetch|networkerror|network error|连接不上/i.test(msg)) return '连不上 Supabase，请检查网络后重试';
   if(!msg) return '连接失败';
   return msg.slice(0, 120);
 }
@@ -2433,78 +2488,108 @@ function setCloudBar(mode, text){
   $('cloudBarIcon').textContent = mode === 'online' ? '✅' : (mode === 'connecting' ? '⏳' : '⚠️');
   $('cloudBarText').textContent = text;
 }
+function supabaseUrl(){
+  return readLS('catSupabaseUrl') || SUPABASE_URL;
+}
+function supabaseKey(){
+  return readLS('catSupabaseKey') || SUPABASE_ANON_KEY;
+}
+function supConfigured(){
+  const u = supabaseUrl(), k = supabaseKey();
+  return !!(u && k && u.indexOf('YOUR-PROJECT') < 0 && k.indexOf('YOUR-ANON') < 0);
+}
+function supHeaders(){
+  return {
+    'apikey': supabaseKey(),
+    'Authorization': 'Bearer ' + supabaseKey(),
+    'Content-Type': 'application/json'
+  };
+}
+async function supFetch(path, opts){
+  opts = opts || {};
+  opts.headers = Object.assign(supHeaders(), opts.headers || {});
+  let res;
+  try{
+    res = await fetch(supabaseUrl() + path, opts);
+  }catch(e){
+    throw new Error('连接不上 Supabase，请检查网络后重试');
+  }
+  const text = await res.text();
+  let data = null;
+  if(text){ try{ data = JSON.parse(text); }catch(e){ data = text; } }
+  if(!res.ok){
+    const detail = (data && (data.message || (data.error && data.error.message))) || ('HTTP ' + res.status);
+    throw new Error(detail ? String(detail).slice(0, 160) : ('HTTP ' + res.status));
+  }
+  return data;
+}
 async function cloudStart(){
   if(cloudPendingLogin) return;
   cloudPendingLogin = true;
-  setCloudBar('connecting', '正在连接云数据库…');
+  if(!supConfigured()){
+    cloudOnline = false;
+    setCloudBar('offline', '⚠️ 还没连接共用数据：点「⚙️ 填 Key」粘贴你的 Supabase 地址和 Key，或看「查看开通步骤」。当前数据仅保存在本机。');
+    cloudPendingLogin = false;
+    return;
+  }
+  setCloudBar('connecting', '正在连接 Supabase…');
   try{
-    if(typeof cloudbase === 'undefined') throw new Error('SDK_LOAD_FAIL');
-    cloudApp = cloudbase.init({env: CLOUD_ENV});
-    await cloudEnsureLogin();
-    cloudDB = cloudApp.database();
+    // 探测连通性（顺便检查表是否已建）
+    await supFetch('/rest/v1/records?select=id&limit=1');
+    cloudApp = { supabase: true };
     cloudOnline = true;
     await cloudBootstrap();
-    setCloudBar('online', '☁️ 云数据库已连接：收支记录、猫咪档案、预算与管理员账号会在所有设备间自动同步');
+    setCloudBar('online', '☁️ 已连接 Supabase：收支、猫咪、预算、管理员账号会在所有设备间自动同步');
     scheduleCloudPoll();
   }catch(e){
-    console.error('CloudBase 连接失败：', e);
+    console.error('Supabase 连接失败：', e);
     cloudOnline = false;
-    setCloudBar('offline', '⚠️ 云数据库未连接：' + cloudErrorMessage(e) + '。当前数据仍保存在本机，点「查看开通步骤」完成设置后可重试。');
+    setCloudBar('offline', '⚠️ 共用数据连接失败：' + cloudErrorMessage(e) + '。按「查看开通步骤」可看怎么建表，改好后点「重试连接」。');
   }finally{
     cloudPendingLogin = false;
   }
 }
-async function cloudEnsureLogin(){
-  const auth = cloudApp.auth();
-  let state = null;
-  try{ state = await auth.getLoginState(); }catch(e){ state = null; }
-  if(state && (state.isAnonymousAuth || state.isAnonymous || state.uid || state.userId)) return;
-  if(auth && typeof auth.anonymousAuthProvider === 'function'){
-    await auth.anonymousAuthProvider().signIn();
-    return;
-  }
-  if(auth && typeof auth.signInAnonymously === 'function'){
-    await auth.signInAnonymously();
-    return;
-  }
-  if(auth && typeof auth.signIn === 'function'){
-    await auth.signIn();
-    return;
-  }
-  throw new Error('当前 CloudBase SDK 不支持匿名登录，请刷新页面重试');
-}
+async function cloudEnsureLogin(){ /* Supabase 无需登录，直接走 anon key */ }
 async function cloudDocGet(colName, id){
   try{
-    const res = await cloudDB.collection(colName).doc(id).get();
-    return (res && res.data) || null;
+    const rows = await supFetch('/rest/v1/' + colName + '?select=*&id=eq.' + encodeURIComponent(id));
+    if(!Array.isArray(rows) || !rows.length) return null;
+    const row = rows[0];
+    if(colName === 'config') return row.payload || null;
+    return row;
   }catch(e){
-    const msg = String((e && (e.message || e.errMsg)) || '');
-    if(/not.?exist|不存在|404|DATABASE_DOCUMENT_NOT_EXIST/i.test(msg)) return null;
+    const msg = String((e && e.message) || e);
+    if(/PGRST116|0 rows|not.?exist|不存在/i.test(msg)) return null;
     throw e;
   }
 }
 async function cloudDocSet(colName, id, obj){
-  await cloudDB.collection(colName).doc(id).set(obj);
+  const payload = Object.assign({id: id}, colName === 'config' ? {payload: obj} : obj);
+  await supFetch('/rest/v1/' + colName + '?on_conflict=id', {
+    method: 'POST',
+    headers: {'Prefer':'resolution=merge-duplicates,return=representation'},
+    body: JSON.stringify(payload)
+  });
 }
 async function cloudDocRemove(colName, id){
   try{
-    await cloudDB.collection(colName).doc(id).remove();
+    await supFetch('/rest/v1/' + colName + '?id=eq.' + encodeURIComponent(id), {method: 'DELETE'});
   }catch(e){
-    const msg = String((e && (e.message || e.errMsg)) || '');
-    if(!/not.?exist|不存在|404|DATABASE_DOCUMENT_NOT_EXIST/i.test(msg)) throw e;
+    const msg = String((e && e.message) || e);
+    if(!/not.?exist|不存在|404|PGRST116/i.test(msg)) throw e;
   }
 }
 async function cloudColAll(colName){
   const out = [];
-  let skip = 0;
-  while(skip < 20000){
-    const res = await cloudDB.collection(colName).skip(skip).limit(100).get();
-    const data = (res && Array.isArray(res.data)) ? res.data : [];
-    for(const d of data){
+  let from = 0;
+  for(let i = 0; i < 60; i++){
+    const rows = await supFetch('/rest/v1/' + colName + '?select=*&order=id.asc&limit=1000&offset=' + from);
+    if(!Array.isArray(rows)) break;
+    for(const d of rows){
       if(d && typeof d === 'object') out.push(d);
     }
-    if(data.length < 100) break;
-    skip += data.length;
+    if(rows.length < 1000) break;
+    from += rows.length;
   }
   return out;
 }
@@ -2524,7 +2609,9 @@ function cloudRecordPayload(r){
   };
 }
 function isCloudFileId(src){
-  return typeof src === 'string' && src.indexOf('cloud://') === 0;
+  return typeof src === 'string' &&
+    (src.indexOf('cloud://') === 0 ||
+     src.indexOf('https://') === 0 && src.indexOf('/storage/v1/object/public/') > 0);
 }
 function dataUrlToBlob(dataUrl){
   const parts = String(dataUrl).split(',');
@@ -2538,20 +2625,22 @@ function dataUrlToBlob(dataUrl){
 async function cloudUploadDataUrl(dataUrl, folder){
   const blob = dataUrlToBlob(dataUrl);
   const path = folder + '/' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8) + '.jpg';
-  if(typeof cloudApp.uploadFile === 'function'){
-    const res = await cloudApp.uploadFile({cloudPath: path, filePath: blob});
-    const fid = res && (res.fileID || res.fileId ||
-      (res.data && (res.data.fileID || res.data.fileId || res.data.id)));
-    if(fid) return String(fid);
+  const uploadUrl = supabaseUrl() + '/storage/v1/object/' + SUPABASE_STORAGE_BUCKET + '/' + path;
+  const res = await fetch(uploadUrl, {
+    method: 'POST',
+    headers: {
+      'apikey': supabaseKey(),
+      'Authorization': 'Bearer ' + supabaseKey(),
+      'x-upsert': 'true',
+      'content-type': blob.type || 'image/jpeg'
+    },
+    body: blob
+  });
+  if(!res.ok){
+    const text = await res.text();
+    throw new Error('照片上传失败：' + (text ? String(text).slice(0, 80) : ('HTTP ' + res.status)));
   }
-  if(cloudApp.storage && typeof cloudApp.storage.from === 'function'){
-    const out = await cloudApp.storage.from().upload(path, blob, {contentType: 'image/jpeg'});
-    if(!out.error && out.data){
-      const fid = out.data.id || out.data.fullPath || (isCloudFileId(out.data.path) ? out.data.path : '');
-      if(fid) return String(fid);
-    }
-  }
-  throw new Error('照片上传失败：请确认已开启匿名登录和云存储权限');
+  return supabaseUrl() + '/storage/v1/object/public/' + SUPABASE_STORAGE_BUCKET + '/' + path;
 }
 async function cloudCatPayload(c){
   const folder = 'cats/' + encodeURIComponent(String(c.id || 'cat'));
@@ -2846,7 +2935,7 @@ async function cloudBootstrap(){
     await cloudDocSet('config', CLOUD_CFG_ID, cfgObj);
     cloudAdoptConfig(cfgObj, true);
     if(photoFail){
-      setCloudBar('online', '☁️ 云数据库已连接（' + photoFail + ' 只猫咪的照片还需上传，请在云存储权限设置好后重新保存该猫咪档案）');
+      setCloudBar('online', '☁️ Supabase 已连接（' + photoFail + ' 只猫咪的照片稍后会自动上传）');
     }
     return;
   }
@@ -2861,85 +2950,15 @@ async function cloudBootstrap(){
     await flushCloud();
   }
 }
-let cloudPhotoPromise = null;
-function cloudCollectPendingPhotoIds(){
-  const list = activeCats();
-  const ids = [];
-  const now = Date.now();
-  for(const key of Object.keys(cloudUrlCache)){
-    if(cloudUrlCache[key].exp <= now) delete cloudUrlCache[key];
-  }
-  function addAll(arr){
-    for(const src of (arr || [])){
-      if(isCloudFileId(src) && !cloudUrlCache[src] && ids.indexOf(src) < 0) ids.push(src);
-    }
-  }
-  list.forEach(function(c){
-    addAll(c.photos);
-    addAll(c.adoptionPhotos);
-    addAll(c.fosterPhotos);
-  });
-  return ids;
-}
-async function cloudResolvePhotoUrls(fileIds){
-  const ids = [];
-  (fileIds || []).forEach(function(id){
-    if(ids.indexOf(id) < 0) ids.push(id);
-  });
-  const map = {};
-  if(!ids.length) return map;
-  try{
-    if(typeof cloudApp.getTempFileURL === 'function'){
-      const res = await cloudApp.getTempFileURL({fileList: ids});
-      const arr = (res && res.fileList) || [];
-      arr.forEach(function(item){
-        const fid = item && (item.fileID || item.fileId || item.id);
-        const url = item && (item.tempFileURL || item.tempFileUrl || item.url);
-        if(fid && url) map[fid] = url;
-      });
-    }
-    if(cloudApp.storage && typeof cloudApp.storage.from === 'function'){
-      const out = await cloudApp.storage.from().createSignedUrls(ids, 7200);
-      if(!out.error && Array.isArray(out.data)){
-        out.data.forEach(function(item, i){
-          if(item && item.signedUrl && ids[i]) map[ids[i]] = item.signedUrl;
-        });
-      }
-    }
-  }catch(e){
-    console.warn('云端照片地址获取失败：', e);
-  }
-  return map;
-}
-function cloudRefreshCatPhotos(ids){
-  if(cloudPhotoPromise) return cloudPhotoPromise;
-  cloudPhotoPromise = cloudResolvePhotoUrls(ids).then(function(map){
-    let changed = false;
-    for(const fid of Object.keys(map)){
-      if(!cloudUrlCache[fid]){
-        cloudUrlCache[fid] = {url: map[fid], exp: Date.now() + 7200 * 1000};
-        changed = true;
-      }
-    }
-    if(changed){
-      saveCloudUrlCache();
-      renderCats();
-    }
-  }).catch(function(){}).finally(function(){
-    cloudPhotoPromise = null;
-  });
-  return cloudPhotoPromise;
-}
+// Supabase 照片用公开链接直接显示，无需再换取临时地址
+function cloudCollectPendingPhotoIds(){ return []; }
+async function cloudResolvePhotoUrls(){ return {}; }
+function cloudRefreshCatPhotos(){ return Promise.resolve({}); }
 function cloudPhotoSrc(src){
   if(!isCloudFileId(src)) return src || CLOUD_BLANK_GIF;
-  const item = cloudUrlCache[src];
-  if(item && item.exp > Date.now()) return item.url;
-  return CLOUD_BLANK_GIF;
+  return src; // 已是可直连的公开 URL
 }
-function cloudRefreshAllCatPhotos(){
-  const ids = cloudCollectPendingPhotoIds();
-  if(ids.length) cloudRefreshCatPhotos(ids);
-}
+function cloudRefreshAllCatPhotos(){ return Promise.resolve(); }
 function scheduleCloudPoll(){
   clearInterval(cloudPollTimer);
   cloudPollTimer = setInterval(function(){
@@ -2966,16 +2985,29 @@ async function cloudPoll(){
     console.warn('后台数据同步失败（稍后自动重试）：', e);
   }
 }
+function saveAndConnectSupabase(){
+  const url = String($('supUrlInput').value || '').trim();
+  const key = String($('supKeyInput').value || '').trim();
+  const err = $('cloudSetupError');
+  if(!url || !key){ err.textContent = '两项都要填哦'; return; }
+  if(url.indexOf('supabase.co') < 0){ err.textContent = '网址看起来不对，应为 ……supabase.co 结尾'; return; }
+  writeLS('catSupabaseUrl', url);
+  writeLS('catSupabaseKey', key);
+  closeOverlay('cloudSetupOverlay');
+  err.textContent = '';
+  cloudOnline = false;
+  cloudStart();
+}
 function copyCloudEnv(){
-  const text = CLOUD_ENV;
+  const text = supabaseUrl();
   if(navigator.clipboard && navigator.clipboard.writeText){
     navigator.clipboard.writeText(text).then(function(){
-      showToast('环境 ID 已复制');
+      showToast('Supabase 地址已复制');
     }).catch(function(){
-      prompt('请手动复制环境 ID：', text);
+      prompt('请手动复制 Supabase 地址：', text);
     });
   }else{
-    prompt('请手动复制环境 ID：', text);
+    prompt('请手动复制 Supabase 地址：', text);
   }
 }
 
@@ -3518,6 +3550,13 @@ function bindEvents(){
     openOverlay('cloudHelpOverlay');
   });
   $('cloudCopyEnvBtn').addEventListener('click', copyCloudEnv);
+  $('cloudSetupBtn').addEventListener('click', function(){
+    $('cloudSetupError').textContent = '';
+    $('supUrlInput').value = readLS('catSupabaseUrl') || '';
+    $('supKeyInput').value = readLS('catSupabaseKey') || '';
+    openOverlay('cloudSetupOverlay');
+  });
+  $('cloudConnectBtn').addEventListener('click', saveAndConnectSupabase);
 
   $('ledgerForm').addEventListener('submit', function(e){
     e.preventDefault();
@@ -3737,7 +3776,7 @@ function bindEvents(){
 
   document.addEventListener('keydown', function(e){
     if(e.key === 'Escape'){
-      ['cloudHelpOverlay','shareOverlay','loginOverlay','pwdOverlay','recycleOverlay','receiptOverlay','adminAccountsOverlay','renameOverlay','catEditorOverlay'].forEach(function(id){
+      ['cloudSetupOverlay','cloudHelpOverlay','shareOverlay','loginOverlay','pwdOverlay','recycleOverlay','receiptOverlay','adminAccountsOverlay','renameOverlay','catEditorOverlay'].forEach(function(id){
         if($(id).classList.contains('open')) closeOverlay(id);
       });
     }
