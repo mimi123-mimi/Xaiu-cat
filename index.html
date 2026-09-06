@@ -959,6 +959,9 @@ footer{
 .inv-log{max-height:200px;overflow:auto;border-top:1px dashed #F0E0CC;margin-top:10px;padding-top:8px;}
 .inv-log-item{display:flex;justify-content:space-between;gap:10px;font-size:12px;color:#7E6550;padding:4px 0;border-bottom:1px dashed #F5EAD8;}
 .inv-log-item .lq{color:#B57B46;font-variant-numeric:tabular-nums;}
+.inv-log-ops{display:inline-flex;gap:4px;margin-left:6px;}
+.inv-log-ops button{border:none;background:transparent;cursor:pointer;font-size:12px;padding:2px 5px;border-radius:6px;color:#B57B46;}
+.inv-log-ops button:hover{background:#FCE8E4;}
 .inv-empty{color:#C0AA93;font-size:13px;text-align:center;padding:14px 0;}
 .inv-mini-form input,.inv-mini-form select{min-width:0;width:100%;}
 .inv-stats{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:#7E6550;margin-top:8px;}
@@ -1250,7 +1253,7 @@ footer{
   <!-- 物资库存 -->
   <section class="card">
     <h2>📦 物资库存</h2>
-    <p class="card-sub">采购入库会自动记一笔财务支出；捐赠入库只加库存；出库消耗只扣库存、绝不重复记账。</p>
+    <p class="card-sub">采购入库会记一笔支出；捐赠入库会记一笔收入；出库消耗只扣库存、绝不重复记账。</p>
     <div class="inv-grid">
       <div class="inv-card" id="publicInvCard">
         <div class="inv-head">
@@ -1616,7 +1619,6 @@ create policy "anon delete cats" on storage.objects for delete using (bucket_id 
     </div>
     <div class="modal-actions no-print">
       <button type="button" class="btn ghost" data-close="receiptOverlay">关闭</button>
-      <button type="button" class="btn primary" id="saveReceiptImgBtn">💾 保存图片</button>
     </div>
   </div>
 </div>
@@ -1701,7 +1703,7 @@ create policy "anon delete cats" on storage.objects for delete using (bucket_id 
       <label for="invInType">入库类型</label>
       <select id="invInType">
         <option value="purchase">采购入库（自动记一笔支出）</option>
-        <option value="donation">捐赠入库（只加库存，不记账）</option>
+        <option value="donation">捐赠入库（自动记一笔收入）</option>
       </select>
     </div>
     <div class="field">
@@ -1751,8 +1753,47 @@ create policy "anon delete cats" on storage.objects for delete using (bucket_id 
   </div>
 </div>
 
+<!-- 通用确认弹窗 -->
+<div class="modal-overlay" id="confirmModal">
+  <div class="modal">
+    <h3 id="confirmTitle">确定操作？</h3>
+    <p class="modal-sub" id="confirmMsg"></p>
+    <div class="modal-actions">
+      <button type="button" class="btn ghost" data-close="confirmModal">取消</button>
+      <button type="button" class="btn danger" id="confirmOkBtn">确定</button>
+    </div>
+  </div>
+</div>
+
+<!-- 修改库存流水来源 -->
+<div class="modal-overlay" id="invLogEditModal">
+  <div class="modal">
+    <h3 id="invLogEditTitle">修改来源</h3>
+    <p class="modal-error" id="invLogEditError"></p>
+    <div class="field">
+      <label for="invLogEditDate">日期</label>
+      <input type="date" id="invLogEditDate">
+    </div>
+    <div class="field">
+      <label for="invLogEditDonor">捐赠来源 / 供应商（可填）</label>
+      <input type="text" id="invLogEditDonor" placeholder="如：咪咪大王" autocomplete="off">
+    </div>
+    <div class="field" id="invLogEditCatField">
+      <label for="invLogEditCat">寄养猫咪名字</label>
+      <input type="text" id="invLogEditCat" placeholder="如：闪电" autocomplete="off">
+    </div>
+    <div class="field">
+      <label for="invLogEditNote">备注 / 用途</label>
+      <input type="text" id="invLogEditNote" placeholder="可填" autocomplete="off">
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn ghost" data-close="invLogEditModal">取消</button>
+      <button type="button" class="btn primary" id="invLogEditSaveBtn">保存</button>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <script>
 'use strict';
 
@@ -3423,8 +3464,14 @@ function invItemLogHtml(pool, itemId, u){
         ? (l.donor ? '来自 ' + escapeHtml(l.donor) + ' ' : '') + escapeHtml(l.note || '')
         : escapeHtml(l.note || '');
     const sign = l.type === 'out' ? '-' : '+';
+    const ops = adminLoggedIn
+      ? '<span class="inv-log-ops">' +
+          '<button type="button" data-inv-log-edit="' + l.id + '" title="修改">✏️</button>' +
+          '<button type="button" data-inv-log-del="' + l.id + '" title="删除">🗑</button>' +
+        '</span>'
+      : '';
     return '<div class="inv-log-item"><span>' + tag + ' ' + escapeHtml(l.itemName) + ' ' + detail +
-      '</span><span class="lq">' + sign + l.qty + (u || '') + '</span></div>';
+      '</span><span><span class="lq">' + sign + l.qty + (u || '') + '</span>' + ops + '</span></div>';
   }).join('') + '</div>';
 }
 function addInvItem(pool){
@@ -3550,11 +3597,55 @@ function delInvItem(pool, id){
   const items = invItems(pool);
   const it = items.find(function(x){ return x.id === id; });
   if(!it) return;
-  if(!confirm('确定删除物资「' + it.name + '」吗？相关出入库流水会保留。')) return;
-  const idx = items.findIndex(function(x){ return x.id === id; });
-  if(idx >= 0) items.splice(idx, 1);
-  saveInvState(pool);
-  showToast('已删除物资');
+  askConfirm('删除整个物资「' + it.name + '」？', '这样会把「' + it.name + '」从库存里整条移除（相关出入库流水会保留）。', function(){
+    const idx = items.findIndex(function(x){ return x.id === id; });
+    if(idx >= 0) items.splice(idx, 1);
+    saveInvState(pool);
+    showToast('已删除物资');
+  });
+}
+let confirmCallback = null;
+function askConfirm(title, msg, onOk){
+  $('confirmTitle').textContent = title;
+  $('confirmMsg').textContent = msg;
+  confirmCallback = onOk;
+  openOverlay('confirmModal');
+}
+let invLogEdit = null;
+function editInvLog(pool, logId){
+  if(!adminLoggedIn){ alert('只有管理员可以修改来源'); return; }
+  const log = invLogs(pool).find(function(l){ return l.id === logId; });
+  if(!log) return;
+  invLogEdit = {pool: pool, logId: logId};
+  $('invLogEditTitle').textContent = '修改来源 · ' + log.itemName;
+  $('invLogEditDate').value = log.date;
+  $('invLogEditDonor').value = log.donor || '';
+  $('invLogEditCat').value = log.catName || '';
+  $('invLogEditNote').value = log.note || '';
+  $('invLogEditCatField').style.display = log.type === 'out' ? '' : 'none';
+  $('invLogEditError').textContent = '';
+  openOverlay('invLogEditModal');
+}
+function saveInvLogEdit(){
+  const log = invLogs(invLogEdit.pool).find(function(l){ return l.id === invLogEdit.logId; });
+  if(!log) return;
+  log.date = $('invLogEditDate').value || todayStr();
+  log.donor = $('invLogEditDonor').value.trim();
+  log.catName = $('invLogEditCat').value.trim();
+  log.note = $('invLogEditNote').value.trim();
+  log.updatedAt = new Date().toISOString();
+  saveInvState(invLogEdit.pool);
+  closeOverlay('invLogEditModal');
+  showToast('✅ 来源已修改');
+}
+function delInvLog(pool, logId){
+  askConfirm('删除这条流水？', '只会删除这条出入库记录，不会影响库存数量。', function(){
+    const logs = invLogs(pool);
+    const idx = logs.findIndex(function(l){ return l.id === logId; });
+    if(idx >= 0) logs.splice(idx, 1);
+    saveInvState(pool);
+    showToast('已删除该条流水');
+  });
 }
 function addPurchasedExpense(itemName, amount, note){
   const now = new Date().toISOString();
@@ -3610,7 +3701,7 @@ function renderRecords(){
       '<td>' + escapeHtml(r.category) + '</td>' +
       '<td class="note-cell" title="' + escapeHtml((r.donor ? '[' + r.donor + '] ' : '') + r.note) + '">' + noteHtml + '</td>' +
       '<td class="amount-cell ' + badgeType + '">' + (noAmount ? '—' : signedMoney(r)) + '</td>' +
-      '<td class="admin-only hidden action-cell">' +
+      '<td class="admin-only' + (adminLoggedIn ? '' : ' hidden') + ' action-cell">' +
         '<button type="button" class="icon-btn" data-edit-id="' + r.id + '" title="修改">✏️</button>' +
         '<button type="button" class="icon-btn delete-btn" data-id="' + r.id + '" title="删除（移入回收站）">🗑️</button>' +
       '</td>' +
@@ -3879,46 +3970,6 @@ function openReceipt(){
   $('receiptTotal').textContent = formatMoney(Math.round(total*100)/100);
   openOverlay('receiptOverlay');
 }
-function saveReceiptImage(){
-  const target = document.querySelector('.receipt-paper');
-  if(!target) return;
-  const btn = $('saveReceiptImgBtn');
-  btn.textContent = '⏳ 生成中…';
-  html2canvas(target, {scale: 2, backgroundColor: '#ffffff', useCORS: true}).then(function(canvas){
-    canvas.toBlob(function(blob){
-      if(!blob){ btn.textContent = '💾 保存图片'; alert('保存图片失败，请重试'); return; }
-      const d = new Date();
-      const fname = '明细单_' + d.getFullYear() + '-' + pad2(d.getMonth()+1) + '-' + pad2(d.getDate()) + '_' + Date.now() + '.png';
-      const file = new File([blob], fname, {type: 'image/png'});
-      let shared = false;
-      try{
-        if(navigator.canShare && navigator.share && navigator.canShare({files: [file]})){
-          shared = true;
-          navigator.share({files: [file], title: '猫团明细单'}).catch(function(){
-            saveReceiptDownload(blob, fname, btn);
-          });
-        }
-      }catch(e){ shared = false; }
-      if(!shared){ saveReceiptDownload(blob, fname, btn); }
-    }, 'image/png');
-  }).catch(function(e){
-    console.error('明细单保存失败：', e);
-    btn.textContent = '💾 保存图片';
-    alert('保存图片失败：' + (e && (e.message || e) || e));
-  });
-}
-function saveReceiptDownload(blob, fname, btn){
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url; link.download = fname;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  setTimeout(function(){ URL.revokeObjectURL(url); }, 2000);
-  btn.textContent = '💾 保存图片';
-  showToast('📥 图片已保存');
-}
-
 /* ---------- 导出 / 导入 ---------- */
 function escapeCsv(v){
   const s = String(v == null ? '' : v);
@@ -4061,18 +4112,19 @@ function setAdminUI(on){
   adminLoggedIn = on;
   $('adminSwitch').checked = on;
   $('adminModeText').textContent = on ? '管理员模式（已开启）' : '管理员模式';
-  const els = document.querySelectorAll('.admin-only');
-  for(const el of els){
-    el.classList.toggle('hidden', !on);
-  }
   if(on){
     $('entrySection').classList.remove('hidden');
   }else{
     selectedIds.clear();
+    $('entrySection').classList.add('hidden');
   }
   renderRecords();
   renderCats();
   renderInventory();
+  const els = document.querySelectorAll('.admin-only');
+  for(const el of els){
+    el.classList.toggle('hidden', !on);
+  }
 }
 function logoutAdmin(){
   removeSS(ADMIN_SESSION_KEY);
@@ -4454,14 +4506,19 @@ function bindEvents(){
   // 库存列表操作（入库/出库/删除）
   ['publicInvList','fosterInvList'].forEach(function(id){
     $(id).addEventListener('click', function(e){
+      const pool = 'publicInvList' === id ? 'public' : 'foster';
+      const logEdit = e.target.closest('[data-inv-log-edit]');
+      if(logEdit){ editInvLog(pool, logEdit.dataset.invLogEdit); return; }
+      const logDel = e.target.closest('[data-inv-log-del]');
+      if(logDel){ delInvLog(pool, logDel.dataset.invLogDel); return; }
       const editBtn = e.target.closest('[data-inv-edit]');
-      if(editBtn){ editInvItem('publicInvList' === id ? 'public' : 'foster', editBtn.dataset.invEdit); return; }
+      if(editBtn){ editInvItem(pool, editBtn.dataset.invEdit); return; }
       const inBtn = e.target.closest('[data-inv-in]');
-      if(inBtn){ invIn('publicInvList' === id ? 'public' : 'foster', inBtn.dataset.invIn); return; }
+      if(inBtn){ invIn(pool, inBtn.dataset.invIn); return; }
       const outBtn = e.target.closest('[data-inv-out]');
-      if(outBtn){ invOut('publicInvList' === id ? 'public' : 'foster', outBtn.dataset.invOut); return; }
+      if(outBtn){ invOut(pool, outBtn.dataset.invOut); return; }
       const delBtn = e.target.closest('[data-inv-del]');
-      if(delBtn){ delInvItem('publicInvList' === id ? 'public' : 'foster', delBtn.dataset.invDel); }
+      if(delBtn){ delInvItem(pool, delBtn.dataset.invDel); }
     });
   });
   // 库存弹窗
@@ -4469,6 +4526,13 @@ function bindEvents(){
   $('invInType').addEventListener('change', toggleInvInFields);
   $('invInSaveBtn').addEventListener('click', saveInvIn);
   $('invOutSaveBtn').addEventListener('click', saveInvOut);
+  $('invLogEditSaveBtn').addEventListener('click', saveInvLogEdit);
+  $('confirmOkBtn').addEventListener('click', function(){
+    const cb = confirmCallback;
+    confirmCallback = null;
+    if(cb) cb();
+    closeOverlay('confirmModal');
+  });
   $('adminAccountsBtn').addEventListener('click', openAdminAccountsModal);
   $('addAdminAccountBtn').addEventListener('click', submitAddAdmin);
   $('renameAdminConfirmBtn').addEventListener('click', submitRenameAdmin);
@@ -4533,7 +4597,6 @@ function bindEvents(){
   });
 
   $('generateReceiptBtn').addEventListener('click', openReceipt);
-  $('saveReceiptImgBtn').addEventListener('click', saveReceiptImage);
 
   $('recycleBinBtn').addEventListener('click', openRecycleBin);
   $('recycleListBody').addEventListener('click', function(e){
@@ -4557,7 +4620,7 @@ function bindEvents(){
 
   document.addEventListener('keydown', function(e){
     if(e.key === 'Escape'){
-      ['cloudSetupOverlay','cloudHelpOverlay','shareOverlay','loginOverlay','pwdOverlay','recycleOverlay','receiptOverlay','adminAccountsOverlay','renameOverlay','catEditorOverlay','invItemModal','invInModal','invOutModal','recordEditModal'].forEach(function(id){
+      ['cloudSetupOverlay','cloudHelpOverlay','shareOverlay','loginOverlay','pwdOverlay','recycleOverlay','receiptOverlay','adminAccountsOverlay','renameOverlay','catEditorOverlay','invItemModal','invInModal','invOutModal','recordEditModal','confirmModal','invLogEditModal'].forEach(function(id){
         if($(id).classList.contains('open')) closeOverlay(id);
       });
     }
@@ -4584,6 +4647,11 @@ function init(){
 }
 init();
 cloudStart();
+if('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')){
+  window.addEventListener('load', function(){
+    navigator.serviceWorker.register('sw.js').catch(function(){});
+  });
+}
 </script>
 </body>
 </html>
