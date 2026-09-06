@@ -2949,10 +2949,7 @@ function cloudRecordPayload(r){
     date: String(r.date || ''),
     createdAt: String(r.createdAt || now),
     updatedAt: String(r.updatedAt || r.createdAt || now),
-    deleted: !!r.deleted,
-    invLink: (r.invLink && r.invLink.pool && r.invLink.logId)
-      ? {pool: r.invLink.pool, logId: String(r.invLink.logId)}
-      : null
+    deleted: !!r.deleted
   };
 }
 function isCloudFileId(src){
