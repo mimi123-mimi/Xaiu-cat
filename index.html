@@ -1139,7 +1139,7 @@ footer{
         </div>
         <div class="field span-2" id="donationInvFields" style="display:none;">
           <div style="border:1px dashed #F0C9A0;border-radius:10px;padding:12px;background:#FFF9F0;">
-            <label style="font-weight:600;color:#A84F12;">🧺 物资捐赠入库（选填）</label>
+            <label id="donBoxLabel" style="font-weight:600;color:#A84F12;">🧺 物资捐赠入库（选填）</label>
             <div class="form-grid" style="margin-top:6px;">
               <div class="field">
                 <label for="donMaterialInput">捐赠物资名称</label>
@@ -1157,7 +1157,7 @@ footer{
                 </select>
               </div>
             </div>
-            <p class="card-sub" style="margin:8px 0 0;">填写后会自动加入对应物资库存（只加库存，不产生支出）。</p>
+            <p class="card-sub" id="donBoxNote" style="margin:8px 0 0;">填写后会自动加入对应物资库存（只加库存，不产生支出）。</p>
           </div>
         </div>
       </div>
@@ -1716,8 +1716,8 @@ create policy "anon delete cats" on storage.objects for delete using (bucket_id 
       <input type="text" id="invInDonor" placeholder="如：XX 爱心人士" autocomplete="off">
     </div>
     <div class="field" id="invInPriceField">
-      <label for="invInPrice">采购单价（元）· 支出=单价×数量</label>
-      <input type="number" id="invInPrice" min="0" step="1" placeholder="金额">
+      <label for="invInPrice">采购花费总额（元）</label>
+      <input type="number" id="invInPrice" min="0" step="0.01" placeholder="如：300">
     </div>
     <div class="field">
       <label for="invInNote">备注（可填）</label>
@@ -2208,7 +2208,10 @@ function normalizeRecord(raw){
     date: date,
     createdAt: String(raw.createdAt || new Date().toISOString()),
     updatedAt: String(raw.updatedAt || raw.createdAt || new Date().toISOString()),
-    deleted: !!raw.deleted
+    deleted: !!raw.deleted,
+    invLink: (raw.invLink && raw.invLink.pool && raw.invLink.logId)
+      ? {pool: raw.invLink.pool === 'foster' ? 'foster' : 'public', logId: String(raw.invLink.logId)}
+      : null
   };
 }
 function loadRecords(){
@@ -2946,7 +2949,10 @@ function cloudRecordPayload(r){
     date: String(r.date || ''),
     createdAt: String(r.createdAt || now),
     updatedAt: String(r.updatedAt || r.createdAt || now),
-    deleted: !!r.deleted
+    deleted: !!r.deleted,
+    invLink: (r.invLink && r.invLink.pool && r.invLink.logId)
+      ? {pool: r.invLink.pool, logId: String(r.invLink.logId)}
+      : null
   };
 }
 function isCloudFileId(src){
@@ -3388,7 +3394,8 @@ function normalizeInvLog(raw){
     catName: String(raw.catName || ''),
     date: String(raw.date || todayStr()),
     createdAt: String(raw.createdAt || new Date().toISOString()),
-    updatedAt: String(raw.updatedAt || raw.createdAt || new Date().toISOString())
+    updatedAt: String(raw.updatedAt || raw.createdAt || new Date().toISOString()),
+    recLink: String(raw.recLink || '')
   };
 }
 function invItems(pool){ return pool === 'foster' ? fosterInv : publicInv; }
@@ -3545,17 +3552,18 @@ function saveInvIn(){
   const it = invItems(invCurPool).find(function(x){ return x.id === invCurItemId; });
   if(!it){ err.textContent = '物资不存在，请刷新后重试'; return; }
   const now = new Date().toISOString();
-  const amount = type === 'purchase' ? Math.round(price * qty * 100) / 100 : 0;
+  const amount = type === 'purchase' ? Math.round(price * 100) / 100 : 0;
   it.quantity += qty; it.totalIn += qty; it.updatedAt = now;
+  const logId = newInvId();
   invLogs(invCurPool).unshift({
-    id: newInvId(), pool: invCurPool, itemId: it.id, itemName: it.name,
+    id: logId, pool: invCurPool, itemId: it.id, itemName: it.name,
     type: type, qty: qty, amount: amount, donor: donor, note: note,
-    catName: '', date: todayStr(), createdAt: now, updatedAt: now
+    catName: '', date: todayStr(), createdAt: now, updatedAt: now, recLink: ''
   });
   if(type === 'purchase'){
-    addPurchasedExpense(it.name, amount, note);
+    addPurchasedExpense(it.name, amount, note, invCurPool, logId);
   }else if(type === 'donation'){
-    addDonationRecord(it.name, donor, note);
+    addDonationRecord(it.name, donor, note, invCurPool, logId);
   }
   saveInvState(invCurPool);
   closeOverlay('invInModal');
@@ -3646,10 +3654,12 @@ function delInvLog(pool, logId){
   const log = invLogs(pool).find(function(l){ return l.id === logId; });
   if(!log) return;
   const it = invItems(pool).find(function(x){ return x.id === log.itemId; });
+  const linked = log.recLink ? findRecord(log.recLink) : null;
+  const warn = linked
+    ? '<br><br><span style="color:#B72E33;font-weight:600;background:#FFE3E0;padding:3px 8px;border-radius:6px;">⚠️ 关联的记账明细也会被同步删除</span>'
+    : '';
   askConfirm('删除这条流水？',
-    '删除后会撤销这条流水对库存的影响：入库的会扣回库存，出库的会退回库存。<br><br>' +
-    '<span style="color:#B72E33;font-weight:600;background:#FFE3E0;padding:3px 8px;border-radius:6px;">⚠️ 关联的记账明细不会被删除</span><br>' +
-    '如需删除，请到「记账明细」里手动删除。', function(){
+    '删除后会撤销这条流水对库存的影响：入库的会扣回库存，出库的会退回库存。' + warn, function(){
     if(it){
       if(log.type === 'out'){
         it.quantity += log.qty;
@@ -3663,27 +3673,41 @@ function delInvLog(pool, logId){
     const idx = logs.findIndex(function(l){ return l.id === logId; });
     if(idx >= 0) logs.splice(idx, 1);
     saveInvState(pool);
-    showToast('已删除该条流水，库存已同步');
+    if(linked){
+      cloudNoteHardRemove('records', linked.record.id);
+      const ridx = records.findIndex(function(r){ return r.id === linked.record.id; });
+      if(ridx >= 0) records.splice(ridx, 1);
+      saveRecords();
+    }
+    renderAll(false);
+    renderRecycleList();
+    showToast(linked ? '已删除流水，关联记账已同步删除' : '已删除该条流水，库存已同步');
   });
 }
-function addPurchasedExpense(itemName, amount, note){
+function addPurchasedExpense(itemName, amount, note, pool, logId){
   const now = new Date().toISOString();
+  const recId = genId();
   records.push({
-    id: genId(), type: 'expense', category: '物资采购',
+    id: recId, type: 'expense', category: '物资采购',
     amount: Math.round(amount * 100) / 100, donor: '',
     note: '【物资采购：' + itemName + '】' + (note ? '（' + note + '）' : ''),
-    date: todayStr(), createdAt: now, updatedAt: now, deleted: false
+    date: todayStr(), createdAt: now, updatedAt: now, deleted: false,
+    invLink: (pool && logId) ? {pool: pool, logId: logId} : null
   });
+  if(pool && logId){ const lg = invLogs(pool).find(function(l){ return l.id === logId; }); if(lg) lg.recLink = recId; }
   saveRecords();
 }
-function addDonationRecord(itemName, donor, note){
+function addDonationRecord(itemName, donor, note, pool, logId){
   const now = new Date().toISOString();
+  const recId = genId();
   records.push({
-    id: genId(), type: 'income', category: '捐赠',
+    id: recId, type: 'income', category: '捐赠',
     amount: 0, donor: donor || '',
     note: '【物资捐赠：' + itemName + '】' + (note ? '（' + note + '）' : ''),
-    date: todayStr(), createdAt: now, updatedAt: now, deleted: false
+    date: todayStr(), createdAt: now, updatedAt: now, deleted: false,
+    invLink: (pool && logId) ? {pool: pool, logId: logId} : null
   });
+  if(pool && logId){ const lg = invLogs(pool).find(function(l){ return l.id === logId; }); if(lg) lg.recLink = recId; }
   saveRecords();
 }
 function buildCloudConfigObject(){
@@ -3756,7 +3780,15 @@ function rebuildCategoryOptions(){
   onCategoryChange();
 }
 function onCategoryChange(){
-  $('donationInvFields').style.display = $('categorySelect').value === '捐赠' ? '' : 'none';
+  const type = $('typeSelect').value;
+  const cat = $('categorySelect').value;
+  const show = cat === '捐赠' || type === 'expense';
+  $('donationInvFields').style.display = show ? '' : 'none';
+  const isDon = cat === '捐赠';
+  $('donBoxLabel').textContent = isDon ? '🧺 物资捐赠入库（选填）' : '🧺 物资入库（选填）';
+  $('donBoxNote').textContent = isDon
+    ? '填写后会自动加入对应物资库存（只加库存，不产生支出）。'
+    : '填写后会自动加入对应物资库存（这条采购支出已记入账本，不会重复记账）。';
 }
 function onDonMaterialChange(){
   const mat = String($('donMaterialInput').value || '').trim();
@@ -3764,7 +3796,7 @@ function onDonMaterialChange(){
   $('donQtyLabel').textContent = isKg ? '数量（kg）' : '数量';
   $('donQtyInput').placeholder = isKg ? '如：1.5' : '数量';
 }
-function donationToInventory(pool, material, qty, donor, note){
+function materialInboundToInventory(pool, material, qty, type, donor, note, recId){
   const items = invItems(pool);
   let it = items.find(function(x){ return x.name === material; });
   const now = new Date().toISOString();
@@ -3773,12 +3805,14 @@ function donationToInventory(pool, material, qty, donor, note){
     items.push(it);
   }
   it.quantity += qty; it.totalIn += qty; it.updatedAt = now;
+  const logId = newInvId();
   invLogs(pool).unshift({
-    id: newInvId(), pool: pool, itemId: it.id, itemName: material,
-    type: 'donation', qty: qty, amount: 0, donor: donor, note: note,
-    catName: '', date: todayStr(), createdAt: now, updatedAt: now
+    id: logId, pool: pool, itemId: it.id, itemName: material,
+    type: type, qty: qty, amount: 0, donor: donor, note: note,
+    catName: '', date: todayStr(), createdAt: now, updatedAt: now, recLink: recId || ''
   });
   saveInvState(pool);
+  return logId;
 }
 function addRecord(){
   const date = $('recordDate').value;
@@ -3817,8 +3851,9 @@ function addRecord(){
   }
 
   const now = new Date().toISOString();
+  const recId = genId();
   records.push({
-    id: genId(),
+    id: recId,
     type: type,
     category: category,
     amount: Math.round(rawAmount * 100) / 100,
@@ -3827,16 +3862,20 @@ function addRecord(){
     date: date,
     createdAt: now,
     updatedAt: now,
-    deleted: false
+    deleted: false,
+    invLink: null
   });
   saveRecords();
 
-  if(category === '捐赠'){
-    const material = $('donMaterialInput').value.trim();
-    const qty = parseInt($('donQtyInput').value, 10) || 0;
-    if(material && qty > 0){
-      donationToInventory($('donPoolSelect').value, material, qty, donor, note);
-    }
+  const material = $('donMaterialInput').value.trim();
+  const qty = parseFloat($('donQtyInput').value) || 0;
+  if(material && qty > 0){
+    const pool = $('donPoolSelect').value;
+    const kind = category === '捐赠' ? 'donation' : 'purchase';
+    const logId = materialInboundToInventory(pool, material, qty, kind, donor, note, recId);
+    const rec = findRecord(recId);
+    if(rec) rec.record.invLink = {pool: pool, logId: logId};
+    saveRecords();
   }
 
   $('amountInput').value = '';
@@ -3853,12 +3892,17 @@ function addRecord(){
 function softDeleteRecord(id){
   const found = findRecord(id);
   if(!found) return;
-  found.record.deleted = true;
-  found.record.updatedAt = new Date().toISOString();
-  selectedIds.delete(id);
-  saveRecords();
-  renderAll(false);
-  showToast('已移入回收站');
+  const link = found.record.invLink;
+  const note = link ? '<br><br>若该条关联了物资入库，物资库记录会在「彻底删除」时同步删除。' : '';
+  askConfirm('删除这条记账？', '将移入回收站（可从回收站恢复）。' + note, function(){
+    found.record.deleted = true;
+    found.record.updatedAt = new Date().toISOString();
+    selectedIds.delete(id);
+    saveRecords();
+    renderAll(false);
+    renderRecycleList();
+    showToast('已移入回收站');
+  });
 }
 
 function restoreRecord(id){
@@ -3923,23 +3967,49 @@ function saveRecordEdit(){
   showToast('✅ 明细已修改');
 }
 
+function removeLinkedInventoryLog(link){
+  if(!link || !link.pool || !link.logId) return;
+  const pool = link.pool;
+  const logs = invLogs(pool);
+  const log = logs.find(function(l){ return l.id === link.logId; });
+  if(!log) return;
+  const item = invItems(pool).find(function(x){ return x.id === log.itemId; });
+  if(item){
+    if(log.type === 'out') item.quantity += log.qty;
+    else { item.quantity = Math.max(0, item.quantity - log.qty); item.totalIn = Math.max(0, item.totalIn - log.qty); }
+    item.updatedAt = new Date().toISOString();
+  }
+  const idx = logs.findIndex(function(l){ return l.id === log.id; });
+  if(idx >= 0) logs.splice(idx, 1);
+  saveInvState(pool);
+}
 function deleteForever(id){
   const found = findRecord(id);
   if(!found) return;
-  if(!confirm('确定彻底删除这条记录吗？该操作不可恢复。')) return;
-  cloudNoteHardRemove('records', id);
-  records.splice(found.index, 1);
-  saveRecords();
-  renderAll(false);
-  renderRecycleList();
-  showToast('已彻底删除');
+  const link = found.record.invLink;
+  const hasLinked = link && invLogs(link.pool).some(function(l){ return l.id === link.logId; });
+  const warn = hasLinked
+    ? '<br><br><span style="color:#B72E33;font-weight:600;background:#FFE3E0;padding:3px 8px;border-radius:6px;">⚠️ 物资库中关联的入库记录会被同步删除</span>'
+    : '';
+  askConfirm('彻底删除这条记账？', '此操作<b>不可恢复</b>。' + warn, function(){
+    if(hasLinked) removeLinkedInventoryLog(link);
+    cloudNoteHardRemove('records', id);
+    records.splice(found.index, 1);
+    saveRecords();
+    renderAll(false);
+    renderRecycleList();
+    showToast('已彻底删除');
+  });
 }
 
 function clearRecycleBin(){
   const del = records.filter(function(r){ return r.deleted; });
   if(!del.length){ showToast('回收站里没有记录'); return; }
-  askConfirm('清空回收站？', '将<b>永久删除</b>回收站里的 ' + del.length + ' 条记录，此操作<b>不可恢复</b>。', function(){
-    del.forEach(function(r){ cloudNoteHardRemove('records', r.id); });
+  askConfirm('清空回收站？', '将<b>永久删除</b>回收站里的 ' + del.length + ' 条记录，此操作<b>不可恢复</b>。<br>关联的物资库记录也会被同步删除。', function(){
+    del.forEach(function(r){
+      if(r.invLink) removeLinkedInventoryLog(r.invLink);
+      cloudNoteHardRemove('records', r.id);
+    });
     records = records.filter(function(r){ return !r.deleted; });
     saveRecords();
     renderAll(false);
