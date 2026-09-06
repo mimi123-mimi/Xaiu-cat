@@ -3286,6 +3286,7 @@ async function cloudBootstrap(){
   ]);
   mergeCloudRecords(cloudRecords);
   mergeCloudCats(cloudCats);
+  runLinkBackfill();
   if(cloudDirtyRecords.size || cloudDirtyCats.size || cloudConfigDirty){
     await flushCloud();
   }
@@ -3320,6 +3321,8 @@ async function cloudPoll(){
     ]);
     mergeCloudRecords(cloudRecords);
     mergeCloudCats(cloudCats);
+    runLinkBackfill();
+    if(cloudDirtyRecords.size || cloudConfigDirty){ await flushCloud(); }
     cloudRefreshAllCatPhotos();
   }catch(e){
     console.warn('后台数据同步失败（稍后自动重试）：', e);
@@ -3814,6 +3817,40 @@ function materialInboundToInventory(pool, material, qty, type, donor, note, recI
   saveInvState(pool);
   return logId;
 }
+function extractInvNameFromRecord(r){
+  const m = String(r.note || '').match(/【物资(?:采购|捐赠)：(.*?)】/);
+  return m ? m[1].trim() : '';
+}
+function linkExistingRecords(){
+  let changed = false;
+  ['public','foster'].forEach(function(pool){
+    const logs = invLogs(pool);
+    records.forEach(function(r){
+      if(r.invLink) return;
+      const name = extractInvNameFromRecord(r);
+      if(!name) return;
+      const wantType = r.category === '捐赠' ? 'donation' : 'purchase';
+      const log = logs.find(function(l){
+        return !l.recLink && l.itemName === name && l.type === wantType && String(l.date) === String(r.date);
+      });
+      if(log){
+        log.recLink = r.id;
+        r.invLink = {pool: pool, logId: log.id};
+        changed = true;
+      }
+    });
+  });
+  return changed;
+}
+function runLinkBackfill(){
+  if(!linkExistingRecords()) return;
+  saveRecords();
+  writeLS(PUB_INV_KEY, JSON.stringify(publicInv));
+  writeLS(PUB_INVLOG_KEY, JSON.stringify(publicInvLogs));
+  writeLS(FOS_INV_KEY, JSON.stringify(fosterInv));
+  writeLS(FOS_INVLOG_KEY, JSON.stringify(fosterInvLogs));
+  if(cloudApp){ cloudConfigDirty = true; scheduleCloudSync(); }
+}
 function addRecord(){
   const date = $('recordDate').value;
   const type = $('typeSelect').value;
@@ -3893,8 +3930,12 @@ function softDeleteRecord(id){
   const found = findRecord(id);
   if(!found) return;
   const link = found.record.invLink;
-  const note = link ? '<br><br>若该条关联了物资入库，物资库记录会在「彻底删除」时同步删除。' : '';
-  askConfirm('删除这条记账？', '将移入回收站（可从回收站恢复）。' + note, function(){
+  const hasLinked = link && invLogs(link.pool).some(function(l){ return l.id === link.logId; });
+  const warn = hasLinked
+    ? '<br><br><span style="color:#B72E33;font-weight:600;background:#FFE3E0;padding:3px 8px;border-radius:6px;">⚠️ 物资库中关联的入库记录也会被同步删除（库存数量会回调）</span>'
+    : '';
+  askConfirm('删除这条记账？', '将移入回收站（可从回收站恢复）。' + warn, function(){
+    if(hasLinked) removeLinkedInventoryLog(link);
     found.record.deleted = true;
     found.record.updatedAt = new Date().toISOString();
     selectedIds.delete(id);
@@ -4753,6 +4794,7 @@ function init(){
     }
   }
   setAdminUI(sessionOn);
+  runLinkBackfill();
   renderAll(false);
 }
 init();
