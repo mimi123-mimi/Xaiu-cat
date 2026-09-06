@@ -664,7 +664,7 @@ tr.selected-row{background:#FFEFDD!important;}
 }
 .amount-cell.income{color:var(--green);}
 .amount-cell.expense{color:var(--red);}
-.action-cell{width:62px;text-align:center;}
+.action-cell{width:100px;text-align:center;white-space:nowrap;}
 .icon-btn{
   border:none;
   background:transparent;
@@ -1621,6 +1621,47 @@ create policy "anon delete cats" on storage.objects for delete using (bucket_id 
   </div>
 </div>
 
+<!-- 修改明细弹窗 -->
+<div class="modal-overlay" id="recordEditModal">
+  <div class="modal">
+    <h3>✏️ 修改明细</h3>
+    <p class="modal-error" id="recordEditError"></p>
+    <div class="form-grid">
+      <div class="field">
+        <label for="editRecordDate">日期</label>
+        <input type="date" id="editRecordDate">
+      </div>
+      <div class="field">
+        <label for="editTypeSelect">类型</label>
+        <select id="editTypeSelect">
+          <option value="expense">支出</option>
+          <option value="income">收入</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="editCategorySelect">类别</label>
+        <select id="editCategorySelect"></select>
+      </div>
+      <div class="field">
+        <label for="editAmountInput">金额（元）</label>
+        <input type="number" id="editAmountInput" min="0" step="0.01" placeholder="0.00">
+      </div>
+      <div class="field">
+        <label for="editDonorInput">捐款人/捐赠人</label>
+        <input type="text" id="editDonorInput" maxlength="40" placeholder="可填">
+      </div>
+      <div class="field span-2">
+        <label for="editNoteInput">备注</label>
+        <input type="text" id="editNoteInput" maxlength="100" placeholder="补充说明">
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn ghost" data-close="recordEditModal">取消</button>
+      <button type="button" class="btn primary" id="recordEditSaveBtn">保存修改</button>
+    </div>
+  </div>
+</div>
+
 <!-- 图片放大灯箱 -->
 <div class="img-lightbox" id="imgLightbox">
   <button type="button" class="img-close" id="imgLightboxClose" aria-label="关闭图片">✕</button>
@@ -1639,6 +1680,10 @@ create policy "anon delete cats" on storage.objects for delete using (bucket_id 
     <div class="field">
       <label for="invItemThreshold">预警阈值（库存低于该值标红提醒）</label>
       <input type="number" id="invItemThreshold" min="0" step="1" value="0">
+    </div>
+    <div class="field">
+      <label for="invItemUnit">单位（选填，猫粮/猫砂建议填 kg）</label>
+      <input type="text" id="invItemUnit" maxlength="8" placeholder="如：kg / 袋 / 盒">
     </div>
     <div class="modal-actions">
       <button type="button" class="btn ghost" data-close="invItemModal">取消</button>
@@ -1661,7 +1706,7 @@ create policy "anon delete cats" on storage.objects for delete using (bucket_id 
     </div>
     <div class="field">
       <label for="invInQty">入库数量</label>
-      <input type="number" id="invInQty" min="1" step="1" placeholder="数量">
+      <input type="number" id="invInQty" min="0.01" step="0.01" placeholder="数量（kg 可填小数）">
     </div>
     <div class="field" id="invInDonorField">
       <label for="invInDonor">捐赠来源（可填可不填）</label>
@@ -1689,7 +1734,7 @@ create policy "anon delete cats" on storage.objects for delete using (bucket_id 
     <p class="modal-error" id="invOutError"></p>
     <div class="field">
       <label for="invOutQty">出库数量</label>
-      <input type="number" id="invOutQty" min="1" step="1" placeholder="数量">
+      <input type="number" id="invOutQty" min="0.01" step="0.01" placeholder="数量（kg 可填小数）">
     </div>
     <div class="field" id="invOutCatField">
       <label for="invOutCat">寄养猫咪名字（寄养池必填）</label>
@@ -3279,6 +3324,7 @@ function normalizeInvItem(raw){
     quantity: qty,
     totalIn: totalIn,
     threshold: Math.max(0, Number(raw.threshold) || 0),
+    unit: String(raw.unit || guessUnit(name)),
     createdAt: String(raw.createdAt || new Date().toISOString()),
     updatedAt: String(raw.updatedAt || raw.createdAt || new Date().toISOString())
   };
@@ -3319,6 +3365,9 @@ function saveInvState(pool){
   renderInventory();
 }
 function newInvId(){ return 'i' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+function guessUnit(name){
+  return /猫粮|猫砂/.test(String(name || '')) ? 'kg' : '';
+}
 function renderInventory(){
   renderInvPool('public');
   renderInvPool('foster');
@@ -3329,9 +3378,10 @@ function renderInvPool(pool){
   const emptyEl = $(pool === 'foster' ? 'fosterInvEmpty' : 'publicInvEmpty');
   if(!listEl) return;
   emptyEl.hidden = items.length > 0;
-  listEl.innerHTML = items.map(function(it){ return invItemHtml(pool, it); }).join('') + invLogHtml(pool);
+  listEl.innerHTML = items.map(function(it){ return invItemHtml(pool, it); }).join('');
 }
 function invItemHtml(pool, it){
+  const u = it.unit ? ' ' + it.unit : '';
   const low = it.threshold > 0 && it.quantity <= it.threshold;
   const lowTag = low ? '<span class="inv-low-tag">⚠ 补货</span>' : '';
   const consumed = Math.max(it.totalIn - it.quantity, 0);
@@ -3344,20 +3394,22 @@ function invItemHtml(pool, it){
   }
   const acts = adminLoggedIn
     ? '<div class="inv-acts">' +
+        '<button type="button" class="btn small ghost" data-inv-edit="' + it.id + '">✏️</button>' +
         '<button type="button" class="btn small secondary" data-inv-in="' + it.id + '">⬇ 入库</button>' +
         '<button type="button" class="btn small ghost" data-inv-out="' + it.id + '">⬆ 出库</button>' +
         '<button type="button" class="btn small danger" data-inv-del="' + it.id + '">🗑</button>' +
       '</div>'
     : '';
   return '<div class="inv-item' + (low ? ' low' : '') + '">' +
-    '<div class="inv-name"><span>' + escapeHtml(it.name) + lowTag + '</span><b class="inv-qty">剩 ' + it.quantity + '</b></div>' +
+    '<div class="inv-name"><span>' + escapeHtml(it.name) + lowTag + '</span><b class="inv-qty">剩 ' + it.quantity + u + '</b></div>' +
     '<div class="inv-progress"><div class="inv-bar' + barCls + '" style="width:' + Math.min(Math.round(pct * 100), 100) + '%;"></div></div>' +
-    '<div class="inv-labels"><span>入库 ' + it.totalIn + '</span><span>已耗 ' + consumed + '</span><span>剩余 ' + it.quantity + '</span></div>' +
+    '<div class="inv-labels"><span>入库 ' + it.totalIn + u + '</span><span>已耗 ' + consumed + u + '</span><span>剩余 ' + it.quantity + u + '</span></div>' +
     acts +
+    invItemLogHtml(pool, it.id, u) +
     '</div>';
 }
-function invLogHtml(pool){
-  const logs = invLogs(pool).slice().sort(function(a, b){
+function invItemLogHtml(pool, itemId, u){
+  const logs = invLogs(pool).filter(function(l){ return l.itemId === itemId; }).slice().sort(function(a, b){
     return String(b.date).localeCompare(String(a.date)) || String(b.createdAt).localeCompare(String(a.createdAt));
   });
   if(!logs.length) return '';
@@ -3372,28 +3424,43 @@ function invLogHtml(pool){
         : escapeHtml(l.note || '');
     const sign = l.type === 'out' ? '-' : '+';
     return '<div class="inv-log-item"><span>' + tag + ' ' + escapeHtml(l.itemName) + ' ' + detail +
-      '</span><span class="lq">' + sign + l.qty + '</span></div>';
+      '</span><span class="lq">' + sign + l.qty + (u || '') + '</span></div>';
   }).join('') + '</div>';
 }
 function addInvItem(pool){
   if(!adminLoggedIn){ alert('只有管理员可以管理物资'); return; }
   invCurPool = pool; invCurItemId = null;
   $('invItemTitle').textContent = (pool === 'foster' ? '寄养池' : '公共物资') + ' · 新增物资';
-  $('invItemName').value = ''; $('invItemThreshold').value = '0'; $('invItemError').textContent = '';
+  $('invItemName').value = ''; $('invItemThreshold').value = '0'; $('invItemUnit').value = ''; $('invItemError').textContent = '';
+  openOverlay('invItemModal');
+  setTimeout(function(){ $('invItemName').focus(); }, 60);
+}
+function editInvItem(pool, id){
+  if(!adminLoggedIn){ alert('只有管理员可以管理物资'); return; }
+  invCurPool = pool; invCurItemId = id;
+  const it = invItems(pool).find(function(x){ return x.id === id; });
+  if(!it) return;
+  $('invItemTitle').textContent = '编辑物资：' + it.name;
+  $('invItemName').value = it.name;
+  $('invItemThreshold').value = it.threshold;
+  $('invItemUnit').value = it.unit || '';
+  $('invItemError').textContent = '';
   openOverlay('invItemModal');
   setTimeout(function(){ $('invItemName').focus(); }, 60);
 }
 function saveInvItem(){
   const name = $('invItemName').value.trim();
   const threshold = Math.max(0, parseInt($('invItemThreshold').value, 10) || 0);
+  let unit = $('invItemUnit').value.trim();
   const err = $('invItemError');
   if(!name){ err.textContent = '请填写物资名称'; return; }
+  if(!unit) unit = guessUnit(name);
   const items = invItems(invCurPool);
   let it = invCurItemId ? items.find(function(x){ return x.id === invCurItemId; }) : null;
   if(it){
-    it.name = name; it.threshold = threshold; it.updatedAt = new Date().toISOString();
+    it.name = name; it.threshold = threshold; it.unit = unit; it.updatedAt = new Date().toISOString();
   }else{
-    it = { id: newInvId(), name: name, quantity: 0, totalIn: 0, threshold: threshold,
+    it = { id: newInvId(), name: name, quantity: 0, totalIn: 0, threshold: threshold, unit: unit,
       createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
     items.push(it);
   }
@@ -3406,7 +3473,7 @@ function invIn(pool, id){
   invCurPool = pool; invCurItemId = id;
   const it = invItems(pool).find(function(x){ return x.id === id; });
   if(!it) return;
-  $('invInTitle').textContent = '入库 · ' + it.name;
+  $('invInTitle').textContent = '入库 · ' + it.name + (it.unit ? '（' + it.unit + '）' : '');
   $('invInType').value = 'purchase'; $('invInQty').value = ''; $('invInPrice').value = '';
   $('invInDonor').value = ''; $('invInNote').value = ''; $('invInError').textContent = '';
   toggleInvInFields();
@@ -3439,18 +3506,20 @@ function saveInvIn(){
   });
   if(type === 'purchase'){
     addPurchasedExpense(it.name, amount, note);
+  }else if(type === 'donation'){
+    addDonationRecord(it.name, donor, note);
   }
   saveInvState(invCurPool);
   closeOverlay('invInModal');
   renderAll(true);
-  showToast('✅ 已入库：' + it.name + ' +' + qty);
+  showToast('✅ 已入库：' + it.name + ' +' + qty + (it.unit ? ' ' + it.unit : ''));
 }
 function invOut(pool, id){
   if(!adminLoggedIn){ alert('只有管理员可以管理物资'); return; }
   invCurPool = pool; invCurItemId = id;
   const it = invItems(pool).find(function(x){ return x.id === id; });
   if(!it) return;
-  $('invOutTitle').textContent = '出库 · ' + it.name + '（剩 ' + it.quantity + '）';
+  $('invOutTitle').textContent = '出库 · ' + it.name + '（剩 ' + it.quantity + (it.unit ? ' ' + it.unit : '') + '）';
   $('invOutQty').value = ''; $('invOutCat').value = ''; $('invOutNote').value = ''; $('invOutError').textContent = '';
   $('invOutCatField').style.display = pool === 'foster' ? '' : 'none';
   openOverlay('invOutModal');
@@ -3497,6 +3566,16 @@ function addPurchasedExpense(itemName, amount, note){
   });
   saveRecords();
 }
+function addDonationRecord(itemName, donor, note){
+  const now = new Date().toISOString();
+  records.push({
+    id: genId(), type: 'income', category: '捐赠',
+    amount: 0, donor: donor || '',
+    note: '【物资捐赠：' + itemName + '】' + (note ? '（' + note + '）' : ''),
+    date: todayStr(), createdAt: now, updatedAt: now, deleted: false
+  });
+  saveRecords();
+}
 function buildCloudConfigObject(){
   return {
     budget: getBudget(),
@@ -3531,7 +3610,10 @@ function renderRecords(){
       '<td>' + escapeHtml(r.category) + '</td>' +
       '<td class="note-cell" title="' + escapeHtml((r.donor ? '[' + r.donor + '] ' : '') + r.note) + '">' + noteHtml + '</td>' +
       '<td class="amount-cell ' + badgeType + '">' + (noAmount ? '—' : signedMoney(r)) + '</td>' +
-      '<td class="admin-only hidden action-cell"><button type="button" class="icon-btn delete-btn" data-id="' + r.id + '" title="删除（移入回收站）">🗑️</button></td>' +
+      '<td class="admin-only hidden action-cell">' +
+        '<button type="button" class="icon-btn" data-edit-id="' + r.id + '" title="修改">✏️</button>' +
+        '<button type="button" class="icon-btn delete-btn" data-id="' + r.id + '" title="删除（移入回收站）">🗑️</button>' +
+      '</td>' +
       '</tr>';
   }).join('');
   $('recordListBody').innerHTML = rows;
@@ -3571,7 +3653,7 @@ function donationToInventory(pool, material, qty, donor, note){
   let it = items.find(function(x){ return x.name === material; });
   const now = new Date().toISOString();
   if(!it){
-    it = { id: newInvId(), name: material, quantity: 0, totalIn: 0, threshold: 0, createdAt: now, updatedAt: now };
+    it = { id: newInvId(), name: material, quantity: 0, totalIn: 0, threshold: 0, unit: guessUnit(material), createdAt: now, updatedAt: now };
     items.push(it);
   }
   it.quantity += qty; it.totalIn += qty; it.updatedAt = now;
@@ -3674,6 +3756,57 @@ function restoreRecord(id){
   showToast('已恢复 1 条记录');
 }
 
+let recordEditId = null;
+function openRecordEdit(id){
+  const f = findRecord(id);
+  if(!f || !adminLoggedIn){ if(!adminLoggedIn){ alert('只有管理员可以修改明细'); } return; }
+  recordEditId = id;
+  const r = f.record;
+  $('editRecordDate').value = r.date;
+  $('editTypeSelect').value = r.type;
+  rebuildEditCategory(r.type, r.category);
+  $('editAmountInput').value = r.amount;
+  $('editDonorInput').value = r.donor || '';
+  $('editNoteInput').value = r.note || '';
+  $('recordEditError').textContent = '';
+  openOverlay('recordEditModal');
+}
+function rebuildEditCategory(type, selected){
+  const sel = $('editCategorySelect');
+  const cats = type === 'expense' ? EXPENSE_CATS : INCOME_CATS;
+  sel.innerHTML = cats.map(function(c){ return '<option value="' + c + '">' + c + '</option>'; }).join('');
+  sel.value = cats.indexOf(selected) >= 0 ? selected : cats[0];
+}
+function saveRecordEdit(){
+  const f = findRecord(recordEditId);
+  if(!f) return;
+  const date = $('editRecordDate').value;
+  const type = $('editTypeSelect').value;
+  const category = $('editCategorySelect').value;
+  const amount = parseFloat($('editAmountInput').value) || 0;
+  const donor = $('editDonorInput').value.trim();
+  const note = $('editNoteInput').value.trim();
+  const err = $('recordEditError');
+  if(!date){ err.textContent = '请选择日期'; return; }
+  if(category === '捐款'){
+    if(type !== 'income'){ err.textContent = '类型为“捐款”时请选择“收入”'; return; }
+    if(!donor){ err.textContent = '类型为“捐款”时必须填写捐款人'; return; }
+    if(!isFinite(amount) || amount <= 0){ err.textContent = '类型为“捐款”时请填写收入金额'; return; }
+  }
+  if(amount === 0 && ['捐赠','捐款'].indexOf(category) < 0){
+    err.textContent = '金额需大于 0（捐赠物资可留空金额）';
+    return;
+  }
+  const now = new Date().toISOString();
+  f.record.date = date; f.record.type = type; f.record.category = category;
+  f.record.amount = Math.round(amount * 100) / 100;
+  f.record.donor = donor; f.record.note = note; f.record.updatedAt = now;
+  saveRecords();
+  closeOverlay('recordEditModal');
+  renderAll(false);
+  showToast('✅ 明细已修改');
+}
+
 function deleteForever(id){
   const found = findRecord(id);
   if(!found) return;
@@ -3752,20 +3885,38 @@ function saveReceiptImage(){
   const btn = $('saveReceiptImgBtn');
   btn.textContent = '⏳ 生成中…';
   html2canvas(target, {scale: 2, backgroundColor: '#ffffff', useCORS: true}).then(function(canvas){
-    const d = new Date();
-    const link = document.createElement('a');
-    link.download = '明细单_' + d.getFullYear() + '-' + pad2(d.getMonth()+1) + '-' + pad2(d.getDate()) + '_' + Date.now() + '.png';
-    link.href = canvas.toDataURL('image/png');
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    btn.textContent = '💾 保存图片';
-    showToast('✅ 图片已保存');
+    canvas.toBlob(function(blob){
+      if(!blob){ btn.textContent = '💾 保存图片'; alert('保存图片失败，请重试'); return; }
+      const d = new Date();
+      const fname = '明细单_' + d.getFullYear() + '-' + pad2(d.getMonth()+1) + '-' + pad2(d.getDate()) + '_' + Date.now() + '.png';
+      const file = new File([blob], fname, {type: 'image/png'});
+      let shared = false;
+      try{
+        if(navigator.canShare && navigator.share && navigator.canShare({files: [file]})){
+          shared = true;
+          navigator.share({files: [file], title: '猫团明细单'}).catch(function(){
+            saveReceiptDownload(blob, fname, btn);
+          });
+        }
+      }catch(e){ shared = false; }
+      if(!shared){ saveReceiptDownload(blob, fname, btn); }
+    }, 'image/png');
   }).catch(function(e){
     console.error('明细单保存失败：', e);
     btn.textContent = '💾 保存图片';
     alert('保存图片失败：' + (e && (e.message || e) || e));
   });
+}
+function saveReceiptDownload(blob, fname, btn){
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url; link.download = fname;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 2000);
+  btn.textContent = '💾 保存图片';
+  showToast('📥 图片已保存');
 }
 
 /* ---------- 导出 / 导入 ---------- */
@@ -4303,6 +4454,8 @@ function bindEvents(){
   // 库存列表操作（入库/出库/删除）
   ['publicInvList','fosterInvList'].forEach(function(id){
     $(id).addEventListener('click', function(e){
+      const editBtn = e.target.closest('[data-inv-edit]');
+      if(editBtn){ editInvItem('publicInvList' === id ? 'public' : 'foster', editBtn.dataset.invEdit); return; }
       const inBtn = e.target.closest('[data-inv-in]');
       if(inBtn){ invIn('publicInvList' === id ? 'public' : 'foster', inBtn.dataset.invIn); return; }
       const outBtn = e.target.closest('[data-inv-out]');
@@ -4360,9 +4513,15 @@ function bindEvents(){
     updateSelectionUI();
   });
   $('recordListBody').addEventListener('click', function(e){
+    const editBtn = e.target.closest('[data-edit-id]');
+    if(editBtn){ openRecordEdit(editBtn.dataset.editId); return; }
     const btn = e.target.closest('.delete-btn');
     if(btn) softDeleteRecord(btn.dataset.id);
   });
+  $('editTypeSelect').addEventListener('change', function(){
+    rebuildEditCategory($('editTypeSelect').value, '');
+  });
+  $('recordEditSaveBtn').addEventListener('click', saveRecordEdit);
 
   $('selectAllChk').addEventListener('change', function(){
     if($('selectAllChk').checked){
@@ -4398,7 +4557,7 @@ function bindEvents(){
 
   document.addEventListener('keydown', function(e){
     if(e.key === 'Escape'){
-      ['cloudSetupOverlay','cloudHelpOverlay','shareOverlay','loginOverlay','pwdOverlay','recycleOverlay','receiptOverlay','adminAccountsOverlay','renameOverlay','catEditorOverlay','invItemModal','invInModal','invOutModal'].forEach(function(id){
+      ['cloudSetupOverlay','cloudHelpOverlay','shareOverlay','loginOverlay','pwdOverlay','recycleOverlay','receiptOverlay','adminAccountsOverlay','renameOverlay','catEditorOverlay','invItemModal','invInModal','invOutModal','recordEditModal'].forEach(function(id){
         if($(id).classList.contains('open')) closeOverlay(id);
       });
     }
