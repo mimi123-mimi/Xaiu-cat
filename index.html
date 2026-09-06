@@ -1146,8 +1146,8 @@ footer{
                 <input type="text" id="donMaterialInput" placeholder="如：猫粮 / 罐头 / 药品" autocomplete="off">
               </div>
               <div class="field">
-                <label for="donQtyInput">数量</label>
-                <input type="number" id="donQtyInput" min="1" step="1" placeholder="数量">
+                <label for="donQtyInput" id="donQtyLabel">数量</label>
+                <input type="number" id="donQtyInput" min="0.01" step="0.01" placeholder="数量">
               </div>
               <div class="field">
                 <label for="donPoolSelect">计入哪个库存</label>
@@ -1588,6 +1588,7 @@ create policy "anon delete cats" on storage.objects for delete using (bucket_id 
     </div>
     <div class="modal-actions">
       <button type="button" class="btn ghost" data-close="recycleOverlay">关闭</button>
+      <button type="button" class="btn danger" id="clearRecycleBtn">🗑️ 一键清空回收站</button>
     </div>
   </div>
 </div>
@@ -3597,7 +3598,10 @@ function delInvItem(pool, id){
   const items = invItems(pool);
   const it = items.find(function(x){ return x.id === id; });
   if(!it) return;
-  askConfirm('删除整个物资「' + it.name + '」？', '这样会把「' + it.name + '」从库存里整条移除（相关出入库流水会保留）。', function(){
+  askConfirm('删除整个物资「' + escapeHtml(it.name) + '」？',
+    '这样会把「<b>' + escapeHtml(it.name) + '</b>」整条物资从库存里移除。<br><br>' +
+    '<span style="color:#B72E33;font-weight:600;background:#FFE3E0;padding:3px 8px;border-radius:6px;">⚠️ 关联的记账明细不会被删除</span><br>' +
+    '如需删除，请到「记账明细」里手动删除；库存出入库流水也会保留。', function(){
     const idx = items.findIndex(function(x){ return x.id === id; });
     if(idx >= 0) items.splice(idx, 1);
     saveInvState(pool);
@@ -3607,7 +3611,7 @@ function delInvItem(pool, id){
 let confirmCallback = null;
 function askConfirm(title, msg, onOk){
   $('confirmTitle').textContent = title;
-  $('confirmMsg').textContent = msg;
+  $('confirmMsg').innerHTML = msg;
   confirmCallback = onOk;
   openOverlay('confirmModal');
 }
@@ -3639,12 +3643,24 @@ function saveInvLogEdit(){
   showToast('✅ 来源已修改');
 }
 function delInvLog(pool, logId){
-  askConfirm('删除这条流水？', '只会删除这条出入库记录，不会影响库存数量。', function(){
+  const log = invLogs(pool).find(function(l){ return l.id === logId; });
+  if(!log) return;
+  const it = invItems(pool).find(function(x){ return x.id === log.itemId; });
+  askConfirm('删除这条流水？', '删除后会撤销这条流水对库存的影响：入库的会扣回库存，出库的会退回库存。', function(){
+    if(it){
+      if(log.type === 'out'){
+        it.quantity += log.qty;
+      }else{
+        it.quantity = Math.max(0, it.quantity - log.qty);
+        it.totalIn = Math.max(0, it.totalIn - log.qty);
+      }
+      it.updatedAt = new Date().toISOString();
+    }
     const logs = invLogs(pool);
     const idx = logs.findIndex(function(l){ return l.id === logId; });
     if(idx >= 0) logs.splice(idx, 1);
     saveInvState(pool);
-    showToast('已删除该条流水');
+    showToast('已删除该条流水，库存已同步');
   });
 }
 function addPurchasedExpense(itemName, amount, note){
@@ -3738,6 +3754,12 @@ function rebuildCategoryOptions(){
 }
 function onCategoryChange(){
   $('donationInvFields').style.display = $('categorySelect').value === '捐赠' ? '' : 'none';
+}
+function onDonMaterialChange(){
+  const mat = String($('donMaterialInput').value || '').trim();
+  const isKg = /猫粮|猫砂/.test(mat);
+  $('donQtyLabel').textContent = isKg ? '数量（kg）' : '数量';
+  $('donQtyInput').placeholder = isKg ? '如：1.5' : '数量';
 }
 function donationToInventory(pool, material, qty, donor, note){
   const items = invItems(pool);
@@ -3908,6 +3930,19 @@ function deleteForever(id){
   renderAll(false);
   renderRecycleList();
   showToast('已彻底删除');
+}
+
+function clearRecycleBin(){
+  const del = records.filter(function(r){ return r.deleted; });
+  if(!del.length){ showToast('回收站里没有记录'); return; }
+  askConfirm('清空回收站？', '将<b>永久删除</b>回收站里的 ' + del.length + ' 条记录，此操作<b>不可恢复</b>。', function(){
+    del.forEach(function(r){ cloudNoteHardRemove('records', r.id); });
+    records = records.filter(function(r){ return !r.deleted; });
+    saveRecords();
+    renderAll(false);
+    renderRecycleList();
+    showToast('已清空回收站');
+  });
 }
 
 /* ---------- 回收站 ---------- */
@@ -4549,6 +4584,7 @@ function bindEvents(){
     rebuildCategoryOptions();
   });
   $('categorySelect').addEventListener('change', onCategoryChange);
+  $('donMaterialInput').addEventListener('input', onDonMaterialChange);
   function updateAmountHint(){
     const type = $('typeSelect').value;
     $('amountHint').innerHTML = type === 'expense'
@@ -4599,6 +4635,7 @@ function bindEvents(){
   $('generateReceiptBtn').addEventListener('click', openReceipt);
 
   $('recycleBinBtn').addEventListener('click', openRecycleBin);
+  $('clearRecycleBtn').addEventListener('click', clearRecycleBin);
   $('recycleListBody').addEventListener('click', function(e){
     const restoreBtn = e.target.closest('.restore-btn');
     if(restoreBtn){ restoreRecord(restoreBtn.dataset.id); return; }
