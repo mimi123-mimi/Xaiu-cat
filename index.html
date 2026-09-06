@@ -3646,7 +3646,10 @@ function delInvLog(pool, logId){
   const log = invLogs(pool).find(function(l){ return l.id === logId; });
   if(!log) return;
   const it = invItems(pool).find(function(x){ return x.id === log.itemId; });
-  askConfirm('删除这条流水？', '删除后会撤销这条流水对库存的影响：入库的会扣回库存，出库的会退回库存。', function(){
+  askConfirm('删除这条流水？',
+    '删除后会撤销这条流水对库存的影响：入库的会扣回库存，出库的会退回库存。<br><br>' +
+    '<span style="color:#B72E33;font-weight:600;background:#FFE3E0;padding:3px 8px;border-radius:6px;">⚠️ 关联的记账明细不会被删除</span><br>' +
+    '如需删除，请到「记账明细」里手动删除。', function(){
     if(it){
       if(log.type === 'out'){
         it.quantity += log.qty;
@@ -3742,8 +3745,8 @@ function updateRecycleButtonCount(){
   $('recycleCount').textContent = records.filter(function(r){ return r.deleted; }).length;
 }
 
-const EXPENSE_CATS = ['猫粮','罐头','绝育','医疗','其他'];
-const INCOME_CATS = ['捐款','捐赠','物资采购','其他'];
+const EXPENSE_CATS = ['猫粮','罐头','绝育','医疗','物资采购','其他'];
+const INCOME_CATS = ['捐款','捐赠','其他'];
 function rebuildCategoryOptions(){
   const sel = $('categorySelect');
   const type = $('typeSelect').value;
