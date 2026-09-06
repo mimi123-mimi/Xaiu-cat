@@ -1134,6 +1134,29 @@ footer{
           <label for="noteInput">备注</label>
           <input type="text" id="noteInput" maxlength="100" placeholder="补充说明，如：买了 5 袋猫粮">
         </div>
+        <div class="field span-2" id="donationInvFields" style="display:none;">
+          <div style="border:1px dashed #F0C9A0;border-radius:10px;padding:12px;background:#FFF9F0;">
+            <label style="font-weight:600;color:#A84F12;">🧺 物资捐赠入库（选填）</label>
+            <div class="form-grid" style="margin-top:6px;">
+              <div class="field">
+                <label for="donMaterialInput">捐赠物资名称</label>
+                <input type="text" id="donMaterialInput" placeholder="如：猫粮 / 罐头 / 药品" autocomplete="off">
+              </div>
+              <div class="field">
+                <label for="donQtyInput">数量</label>
+                <input type="number" id="donQtyInput" min="1" step="1" placeholder="数量">
+              </div>
+              <div class="field">
+                <label for="donPoolSelect">计入哪个库存</label>
+                <select id="donPoolSelect">
+                  <option value="public">🏪 公共物资</option>
+                  <option value="foster">🏠 寄养专项</option>
+                </select>
+              </div>
+            </div>
+            <p class="card-sub" style="margin:8px 0 0;">填写后会自动加入对应物资库存（只加库存，不产生支出）。</p>
+          </div>
+        </div>
       </div>
       <p class="amount-preview" id="amountHint">支出会自动记为负数</p>
       <p class="form-error" id="formError"></p>
@@ -3530,6 +3553,35 @@ function updateRecycleButtonCount(){
   $('recycleCount').textContent = records.filter(function(r){ return r.deleted; }).length;
 }
 
+const EXPENSE_CATS = ['猫粮','罐头','绝育','医疗','其他'];
+const INCOME_CATS = ['捐款','捐赠','物资采购','其他'];
+function rebuildCategoryOptions(){
+  const sel = $('categorySelect');
+  const type = $('typeSelect').value;
+  const cats = type === 'expense' ? EXPENSE_CATS : INCOME_CATS;
+  sel.innerHTML = cats.map(function(c){ return '<option value="' + c + '">' + c + '</option>'; }).join('');
+  sel.value = cats[0];
+  onCategoryChange();
+}
+function onCategoryChange(){
+  $('donationInvFields').style.display = $('categorySelect').value === '捐赠' ? '' : 'none';
+}
+function donationToInventory(pool, material, qty, donor, note){
+  const items = invItems(pool);
+  let it = items.find(function(x){ return x.name === material; });
+  const now = new Date().toISOString();
+  if(!it){
+    it = { id: newInvId(), name: material, quantity: 0, totalIn: 0, threshold: 0, createdAt: now, updatedAt: now };
+    items.push(it);
+  }
+  it.quantity += qty; it.totalIn += qty; it.updatedAt = now;
+  invLogs(pool).unshift({
+    id: newInvId(), pool: pool, itemId: it.id, itemName: material,
+    type: 'donation', qty: qty, amount: 0, donor: donor, note: note,
+    catName: '', date: todayStr(), createdAt: now, updatedAt: now
+  });
+  saveInvState(pool);
+}
 function addRecord(){
   const date = $('recordDate').value;
   const type = $('typeSelect').value;
@@ -3581,8 +3633,18 @@ function addRecord(){
   });
   saveRecords();
 
+  if(category === '捐赠'){
+    const material = $('donMaterialInput').value.trim();
+    const qty = parseInt($('donQtyInput').value, 10) || 0;
+    if(material && qty > 0){
+      donationToInventory($('donPoolSelect').value, material, qty, donor, note);
+    }
+  }
+
   $('amountInput').value = '';
   $('noteInput').value = '';
+  $('donMaterialInput').value = '';
+  $('donQtyInput').value = '';
   $('commonNoteSelect').value = '';
   err.textContent = '';
   selectedIds.clear();
@@ -3793,13 +3855,16 @@ function importJSON(file){
 }
 
 /* ---------- 弹窗 ---------- */
+const overlayScrollY = {};
 function openOverlay(id){
+  overlayScrollY[id] = window.scrollY || document.documentElement.scrollTop || 0;
   $(id).classList.add('open');
   document.body.style.overflow = 'hidden';
 }
 function closeOverlay(id){
   $(id).classList.remove('open');
   document.body.style.overflow = '';
+  window.scrollTo(0, overlayScrollY[id] || 0);
 }
 
 /* ---------- 分享 / 二维码 ---------- */
@@ -4262,7 +4327,11 @@ function bindEvents(){
     if(e.key === 'Enter'){ e.preventDefault(); $('loginPassword').focus(); }
   });
 
-  $('typeSelect').addEventListener('change', updateAmountHint);
+  $('typeSelect').addEventListener('change', function(){
+    updateAmountHint();
+    rebuildCategoryOptions();
+  });
+  $('categorySelect').addEventListener('change', onCategoryChange);
   function updateAmountHint(){
     const type = $('typeSelect').value;
     $('amountHint').innerHTML = type === 'expense'
@@ -4270,6 +4339,7 @@ function bindEvents(){
       : '收入将记为正数，例如输入 50 会记作 <b>+¥50.00</b>';
   }
   updateAmountHint();
+  rebuildCategoryOptions();
 
   $('commonNoteSelect').addEventListener('change', function(){
     const val = $('commonNoteSelect').value;
