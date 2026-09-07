@@ -2205,7 +2205,8 @@ function normalizeRecord(raw){
     deleted: !!raw.deleted,
     invLink: (raw.invLink && raw.invLink.pool && raw.invLink.logId)
       ? {pool: raw.invLink.pool === 'foster' ? 'foster' : 'public', logId: String(raw.invLink.logId)}
-      : null
+      : null,
+    invBackup: (raw.invBackup && raw.invBackup.pool) ? raw.invBackup : null
   };
 }
 function loadRecords(){
@@ -3109,10 +3110,18 @@ function cloudAdoptConfig(cfg, firstSeed){
   const budgetNum = rawBudget === null || rawBudget === '' ? null : Number(rawBudget);
   const budget = (isFinite(budgetNum) && budgetNum > 0) ? Math.round(budgetNum * 100) / 100 : null;
   const updatedAt = String(cfg.updatedAt || new Date().toISOString());
+  // 库存与流水总是载入（保底，避免某些设备/手机上不显示明细）
+  if(Array.isArray(cfg.publicInv)){ publicInv = cfg.publicInv.map(normalizeInvItem).filter(Boolean); writeLS(PUB_INV_KEY, JSON.stringify(publicInv)); }
+  if(Array.isArray(cfg.publicInvLogs)){ publicInvLogs = cfg.publicInvLogs.map(normalizeInvLog).filter(Boolean); writeLS(PUB_INVLOG_KEY, JSON.stringify(publicInvLogs)); }
+  if(Array.isArray(cfg.fosterInv)){ fosterInv = cfg.fosterInv.map(normalizeInvItem).filter(Boolean); writeLS(FOS_INV_KEY, JSON.stringify(fosterInv)); }
+  if(Array.isArray(cfg.fosterInvLogs)){ fosterInvLogs = cfg.fosterInvLogs.map(normalizeInvLog).filter(Boolean); writeLS(FOS_INVLOG_KEY, JSON.stringify(fosterInvLogs)); }
   if(cloudConfigCache &&
     cloudConfigCache.updatedAt === updatedAt &&
     JSON.stringify(cloudConfigCache.admins) === JSON.stringify(admins) &&
     Number(cloudConfigCache.budget) === Number(budget)){
+    cloudConfigCache.lastConnectedAt = new Date().toISOString();
+    saveCloudConfigCache(cloudConfigCache);
+    renderInventory();
     return;
   }
   const oldName = currentAdminName;
@@ -3125,10 +3134,6 @@ function cloudAdoptConfig(cfg, firstSeed){
   saveCloudConfigCache(cloudConfigCache);
   writeLS(ADMINS_KEY, JSON.stringify(admins));
   writeLS(BUDGET_KEY, budget === null ? '' : String(budget));
-  if(Array.isArray(cfg.publicInv)){ publicInv = cfg.publicInv.map(normalizeInvItem).filter(Boolean); writeLS(PUB_INV_KEY, JSON.stringify(publicInv)); }
-  if(Array.isArray(cfg.publicInvLogs)){ publicInvLogs = cfg.publicInvLogs.map(normalizeInvLog).filter(Boolean); writeLS(PUB_INVLOG_KEY, JSON.stringify(publicInvLogs)); }
-  if(Array.isArray(cfg.fosterInv)){ fosterInv = cfg.fosterInv.map(normalizeInvItem).filter(Boolean); writeLS(FOS_INV_KEY, JSON.stringify(fosterInv)); }
-  if(Array.isArray(cfg.fosterInvLogs)){ fosterInvLogs = cfg.fosterInvLogs.map(normalizeInvLog).filter(Boolean); writeLS(FOS_INVLOG_KEY, JSON.stringify(fosterInvLogs)); }
   if(adminLoggedIn && oldName && !admins.some(function(a){
     return String(a.name).toLowerCase() === String(oldName).toLowerCase();
   })){
@@ -3358,8 +3363,8 @@ function normalizeInvItem(raw){
   if(!raw || typeof raw !== 'object') return null;
   const name = String(raw.name || '').trim();
   if(!name) return null;
-  const qty = Math.max(0, Number(raw.quantity) || 0);
-  const totalIn = Math.max(qty, Number(raw.totalIn) || qty);
+  const qty = Math.max(0, roundQty(raw.quantity));
+  const totalIn = Math.max(qty, roundQty(raw.totalIn) || qty);
   return {
     id: String(raw.id || raw._id || genId()),
     name: name,
@@ -3411,6 +3416,8 @@ function newInvId(){ return 'i' + Date.now().toString(36) + Math.random().toStri
 function guessUnit(name){
   return /猫粮|猫砂/.test(String(name || '')) ? 'kg' : '';
 }
+function roundQty(n){ return Math.round((Number(n) || 0) * 100) / 100; }
+function formatQty(n){ return String(roundQty(n)); }
 function renderInventory(){
   renderInvPool('public');
   renderInvPool('foster');
@@ -3427,7 +3434,7 @@ function invItemHtml(pool, it){
   const u = it.unit ? ' ' + it.unit : '';
   const low = it.threshold > 0 && it.quantity <= it.threshold;
   const lowTag = low ? '<span class="inv-low-tag">⚠ 补货</span>' : '';
-  const consumed = Math.max(it.totalIn - it.quantity, 0);
+  const consumed = Math.max(roundQty(it.totalIn - it.quantity), 0);
   const pct = it.totalIn > 0 ? (it.quantity / it.totalIn) : 1;
   let barCls = '';
   if(pool === 'foster'){
@@ -3444,16 +3451,16 @@ function invItemHtml(pool, it){
       '</div>'
     : '';
   return '<div class="inv-item' + (low ? ' low' : '') + '">' +
-    '<div class="inv-name"><span>' + escapeHtml(it.name) + lowTag + '</span><b class="inv-qty">剩 ' + it.quantity + u + '</b></div>' +
+    '<div class="inv-name"><span>' + escapeHtml(it.name) + lowTag + '</span><b class="inv-qty">剩 ' + formatQty(it.quantity) + u + '</b></div>' +
     '<div class="inv-progress"><div class="inv-bar' + barCls + '" style="width:' + Math.min(Math.round(pct * 100), 100) + '%;"></div></div>' +
-    '<div class="inv-labels"><span>入库 ' + it.totalIn + u + '</span><span>已耗 ' + consumed + u + '</span><span>剩余 ' + it.quantity + u + '</span></div>' +
+    '<div class="inv-labels"><span>入库 ' + formatQty(it.totalIn) + u + '</span><span>已耗 ' + formatQty(consumed) + u + '</span><span>剩余 ' + formatQty(it.quantity) + u + '</span></div>' +
     acts +
     invItemLogHtml(pool, it, u) +
     '</div>';
 }
 function invItemLogHtml(pool, it, u){
   const logs = invLogs(pool).filter(function(l){
-    return l.itemId === it.id || l.itemName === it.name;
+    return l.itemId === it.id || String(l.itemName || '').trim() === String(it.name || '').trim();
   }).slice().sort(function(a, b){
     return String(b.date).localeCompare(String(a.date)) || String(b.createdAt).localeCompare(String(a.createdAt));
   });
@@ -3475,7 +3482,7 @@ function invItemLogHtml(pool, it, u){
         '</span>'
       : '';
     return '<div class="inv-log-item"><span>' + tag + ' ' + escapeHtml(l.itemName) + ' ' + detail +
-      '</span><span><span class="lq">' + sign + l.qty + (u || '') + '</span>' + ops + '</span></div>';
+      '</span><span><span class="lq">' + sign + formatQty(l.qty) + (u || '') + '</span>' + ops + '</span></div>';
   }).join('') + '</div>';
 }
 function addInvItem(pool){
@@ -3549,7 +3556,7 @@ function saveInvIn(){
   if(!it){ err.textContent = '物资不存在，请刷新后重试'; return; }
   const now = new Date().toISOString();
   const amount = type === 'purchase' ? Math.round(price * 100) / 100 : 0;
-  it.quantity += qty; it.totalIn += qty; it.updatedAt = now;
+  it.quantity = roundQty(it.quantity + qty); it.totalIn = roundQty(it.totalIn + qty); it.updatedAt = now;
   const logId = newInvId();
   invLogs(invCurPool).unshift({
     id: logId, pool: invCurPool, itemId: it.id, itemName: it.name,
@@ -3588,7 +3595,7 @@ function saveInvOut(){
   if(!it){ err.textContent = '物资不存在，请刷新后重试'; return; }
   if(qty > it.quantity){ err.textContent = '库存不足！当前仅剩 ' + it.quantity; return; }
   const now = new Date().toISOString();
-  it.quantity -= qty; it.updatedAt = now;
+  it.quantity = roundQty(it.quantity - qty); it.updatedAt = now;
   invLogs(invCurPool).unshift({
     id: newInvId(), pool: invCurPool, itemId: it.id, itemName: it.name,
     type: 'out', qty: qty, amount: 0, donor: '', note: note,
@@ -3658,10 +3665,10 @@ function delInvLog(pool, logId){
     '删除后会撤销这条流水对库存的影响：入库的会扣回库存，出库的会退回库存。' + warn, function(){
     if(it){
       if(log.type === 'out'){
-        it.quantity += log.qty;
+        it.quantity = roundQty(it.quantity + log.qty);
       }else{
-        it.quantity = Math.max(0, it.quantity - log.qty);
-        it.totalIn = Math.max(0, it.totalIn - log.qty);
+        it.quantity = Math.max(0, roundQty(it.quantity - log.qty));
+        it.totalIn = Math.max(0, roundQty(it.totalIn - log.qty));
       }
       it.updatedAt = new Date().toISOString();
     }
@@ -3778,7 +3785,8 @@ function rebuildCategoryOptions(){
 function onCategoryChange(){
   const type = $('typeSelect').value;
   const cat = $('categorySelect').value;
-  const show = cat === '捐赠' || type === 'expense';
+  const materialExpense = type === 'expense' && ['猫粮','罐头','物资采购','其他'].indexOf(cat) >= 0;
+  const show = cat === '捐赠' || materialExpense;
   $('donationInvFields').style.display = show ? '' : 'none';
   const isDon = cat === '捐赠';
   $('donBoxLabel').textContent = isDon ? '🧺 物资捐赠入库（选填）' : '🧺 物资入库（选填）';
@@ -3800,7 +3808,7 @@ function materialInboundToInventory(pool, material, qty, type, donor, note, recI
     it = { id: newInvId(), name: material, quantity: 0, totalIn: 0, threshold: 0, unit: guessUnit(material), createdAt: now, updatedAt: now };
     items.push(it);
   }
-  it.quantity += qty; it.totalIn += qty; it.updatedAt = now;
+  it.quantity = roundQty(it.quantity + qty); it.totalIn = roundQty(it.totalIn + qty); it.updatedAt = now;
   const logId = newInvId();
   invLogs(pool).unshift({
     id: logId, pool: pool, itemId: it.id, itemName: material,
@@ -3824,6 +3832,7 @@ function linkExistingRecords(){
       if(!name) return;
       const wantType = r.category === '捐赠' ? 'donation' : 'purchase';
       const log = logs.find(function(l){
+        if(l.recLink === r.id) return true;
         return !l.recLink && l.itemName === name && l.type === wantType && String(l.date) === String(r.date);
       });
       if(log){
@@ -3927,7 +3936,17 @@ function softDeleteRecord(id){
     ? '<br><br><span style="color:#B72E33;font-weight:600;background:#FFE3E0;padding:3px 8px;border-radius:6px;">⚠️ 物资库中关联的入库记录也会被同步删除（库存数量会回调）</span>'
     : '';
   askConfirm('删除这条记账？', '将移入回收站（可从回收站恢复）。' + warn, function(){
-    if(hasLinked) removeLinkedInventoryLog(link);
+    if(hasLinked){
+      const log = invLogs(link.pool).find(function(l){ return l.id === link.logId; });
+      if(log){
+        found.record.invBackup = {
+          pool: link.pool, itemId: log.itemId, itemName: log.itemName,
+          qty: log.qty, type: log.type, amount: log.amount,
+          donor: log.donor, note: log.note, catName: log.catName, date: log.date
+        };
+      }
+      removeLinkedInventoryLog(link);
+    }
     found.record.deleted = true;
     found.record.updatedAt = new Date().toISOString();
     selectedIds.delete(id);
@@ -3943,10 +3962,38 @@ function restoreRecord(id){
   if(!found) return;
   found.record.deleted = false;
   found.record.updatedAt = new Date().toISOString();
+  let restoredInv = false;
+  if(found.record.invBackup){
+    restoredInv = restoreInventoryBackup(found.record);
+  }
   saveRecords();
   renderAll(false);
   renderRecycleList();
-  showToast('已恢复 1 条记录');
+  showToast(restoredInv ? '已恢复记录，物资库存也已恢复' : '已恢复 1 条记录');
+}
+function restoreInventoryBackup(record){
+  const b = record.invBackup;
+  if(!b || !b.pool || !b.qty) return false;
+  const items = invItems(b.pool);
+  let item = items.find(function(x){ return x.id === b.itemId; });
+  if(!item){ item = items.find(function(x){ return x.name === b.itemName; }); }
+  const now = new Date().toISOString();
+  if(!item){
+    item = { id: newInvId(), name: b.itemName, quantity: 0, totalIn: 0, threshold: 0, unit: guessUnit(b.itemName), createdAt: now, updatedAt: now };
+    items.push(item);
+  }
+  item.quantity += roundQty(b.qty); item.totalIn += roundQty(b.qty); item.updatedAt = now;
+  const logId = newInvId();
+  invLogs(b.pool).unshift({
+    id: logId, pool: b.pool, itemId: item.id, itemName: b.itemName,
+    type: b.type, qty: roundQty(b.qty), amount: roundQty(b.amount) || 0,
+    donor: b.donor || '', note: b.note || '', catName: b.catName || '',
+    date: b.date || todayStr(), createdAt: now, updatedAt: now, recLink: record.id
+  });
+  record.invLink = {pool: b.pool, logId: logId};
+  record.invBackup = null;
+  saveInvState(b.pool);
+  return true;
 }
 
 let recordEditId = null;
