@@ -800,6 +800,7 @@ footer{
   gap:6px;
 }
 .receipt-modal table{min-width:0;}
+.receipt-paper{overflow-x:auto;-webkit-overflow-scrolling:touch;}
 .receipt-modal th{background:#FFF1E1;}
 .receipt-total{
   text-align:right;
@@ -882,6 +883,9 @@ footer{
   .header-inner{padding:14px 14px;}
   .brand h1{font-size:21px;}
   .modal{padding:17px;}
+  .receipt-modal{width:100%;max-width:100%;margin:0;padding:0;border-radius:0;}
+  .receipt-paper{padding:12px;}
+  .receipt-paper table{min-width:560px;}
 }
 
 /* 图片查看灯箱 */
@@ -998,8 +1002,6 @@ footer{
     <span id="cloudBarText">正在连接云数据库…</span>
     <span class="cloud-bar-actions">
       <button type="button" id="cloudRetryBtn" class="cloud-btn">重试连接</button>
-      <button type="button" id="cloudHelpBtn" class="cloud-btn">查看开通步骤</button>
-      <button type="button" id="cloudSetupBtn" class="cloud-btn">⚙️ 填 Key</button>
     </span>
   </div>
 </div>
@@ -1124,15 +1126,6 @@ footer{
           <label for="amountInput">金额（元，捐赠物资可不填）</label>
           <input type="number" id="amountInput" min="0" step="0.01" placeholder="0.00">
         </div>
-        <div class="field">
-          <label for="commonNoteSelect">常用备注</label>
-          <select id="commonNoteSelect">
-            <option value="">— 选择后自动填入，可修改 —</option>
-            <option value="XX宠物店猫粮">XX宠物店猫粮</option>
-            <option value="YY医院绝育">YY医院绝育</option>
-            <option value="ZZ超市罐头">ZZ超市罐头</option>
-          </select>
-        </div>
         <div class="field span-2">
           <label for="noteInput">备注</label>
           <input type="text" id="noteInput" maxlength="100" placeholder="补充说明，如：买了 5 袋猫粮">
@@ -1182,10 +1175,7 @@ footer{
       </label>
       <div class="toolbar-btns">
         <button type="button" class="btn secondary" id="generateReceiptBtn" disabled>🧾 生成明细单</button>
-        <button type="button" class="btn ghost admin-only hidden" id="exportCsvBtn">📤 导出 CSV</button>
-        <button type="button" class="btn ghost admin-only hidden" id="exportJsonBtn">💾 导出 JSON</button>
-        <button type="button" class="btn ghost admin-only hidden" id="importJsonBtn">📥 导入 JSON</button>
-        <input type="file" id="importJsonInput" accept=".json,application/json" hidden>
+        <button type="button" class="btn ghost admin-only hidden" id="exportCsvBtn">📄 导出表格</button>
       </div>
     </div>
     <div class="table-wrap">
@@ -1207,48 +1197,8 @@ footer{
     </div>
   </section>
 
-  <!-- 猫咪档案全集 -->
-  <section class="card" id="catArchiveSection">
-    <div class="cats-toolbar">
-      <div>
-        <h2>🐈 猫咪档案全集</h2>
-        <p class="card-sub">点照片可放大；普通成员只读，管理员才能新增 / 编辑 / 删除</p>
-      </div>
-      <div class="cats-ctl">
-        <div class="cats-filter" id="catsFilter">
-          <button type="button" data-filter="all" class="active">全部</button>
-          <button type="button" data-filter="pending">待领养</button>
-          <button type="button" data-filter="adopted">已领养</button>
-        </div>
-        <button type="button" class="btn secondary admin-only hidden" id="addCatBtn">＋ 添加猫咪</button>
-        <button type="button" class="collapse-btn" id="catsCollapseBtn">收起<span class="arrow">▾</span></button>
-      </div>
-    </div>
-    <div id="catsFold">
-      <div id="catArchiveEmpty" class="empty-tip"><span>🐾</span>还没有猫咪档案，点击“添加猫咪”开始记录</div>
-      <div class="cats-grid" id="catsGrid"></div>
-    </div>
-  </section>
 
-  <!-- 数据可视化 -->
-  <section class="charts-grid">
-    <div class="card chart-card">
-      <h2>🍩 本月支出分类占比</h2>
-      <p class="card-sub">仅统计本月“支出”记录</p>
-      <div class="chart-wrap">
-        <canvas id="pieChart"></canvas>
-        <div id="pieEmpty" class="chart-empty">暂无本月支出数据</div>
-      </div>
-    </div>
-    <div class="card chart-card">
-      <h2>📈 近 12 个月支出趋势</h2>
-      <p class="card-sub">每月总支出（元）</p>
-      <div class="chart-wrap">
-        <canvas id="lineChart"></canvas>
-        <div id="lineEmpty" class="chart-empty">暂无支出数据，完成记账后自动生成趋势</div>
-      </div>
-    </div>
-  </section>
+
 
   <!-- 物资库存 -->
   <section class="card">
@@ -1279,7 +1229,51 @@ footer{
       </div>
     </div>
   </section>
+  <!-- 数据可视化 -->
+  <section class="charts-grid">
+    <div class="card chart-card">
+      <h2>🍩 本月支出分类占比</h2>
+      <p class="card-sub">仅统计本月“支出”记录</p>
+      <div class="chart-wrap">
+        <canvas id="pieChart"></canvas>
+        <div id="pieEmpty" class="chart-empty">暂无本月支出数据</div>
+      </div>
+    </div>
+    <div class="card chart-card">
+      <h2>📈 近 12 个月支出趋势</h2>
+      <p class="card-sub">每月总支出（元）</p>
+      <div class="chart-wrap">
+        <canvas id="lineChart"></canvas>
+        <div id="lineEmpty" class="chart-empty">暂无支出数据，完成记账后自动生成趋势</div>
+      </div>
+    </div>
+  </section>
 
+
+
+
+  <!-- 猫咪档案全集 -->
+  <section class="card" id="catArchiveSection">
+    <div class="cats-toolbar">
+      <div>
+        <h2>🐈 猫咪档案全集</h2>
+        <p class="card-sub">点照片可放大；普通成员只读，管理员才能新增 / 编辑 / 删除</p>
+      </div>
+      <div class="cats-ctl">
+        <div class="cats-filter" id="catsFilter">
+          <button type="button" data-filter="all" class="active">全部</button>
+          <button type="button" data-filter="pending">待领养</button>
+          <button type="button" data-filter="adopted">已领养</button>
+        </div>
+        <button type="button" class="btn secondary admin-only hidden" id="addCatBtn">＋ 添加猫咪</button>
+        <button type="button" class="collapse-btn" id="catsCollapseBtn">收起<span class="arrow">▾</span></button>
+      </div>
+    </div>
+    <div id="catsFold">
+      <div id="catArchiveEmpty" class="empty-tip"><span>🐾</span>还没有猫咪档案，点击“添加猫咪”开始记录</div>
+      <div class="cats-grid" id="catsGrid"></div>
+    </div>
+  </section>
   <section class="bottom-area">
     <button type="button" class="btn ghost admin-only hidden" id="recycleBinBtn">🗑️ 回收站（<span id="recycleCount">0</span>）</button>
   </section>
@@ -3454,11 +3448,13 @@ function invItemHtml(pool, it){
     '<div class="inv-progress"><div class="inv-bar' + barCls + '" style="width:' + Math.min(Math.round(pct * 100), 100) + '%;"></div></div>' +
     '<div class="inv-labels"><span>入库 ' + it.totalIn + u + '</span><span>已耗 ' + consumed + u + '</span><span>剩余 ' + it.quantity + u + '</span></div>' +
     acts +
-    invItemLogHtml(pool, it.id, u) +
+    invItemLogHtml(pool, it, u) +
     '</div>';
 }
-function invItemLogHtml(pool, itemId, u){
-  const logs = invLogs(pool).filter(function(l){ return l.itemId === itemId; }).slice().sort(function(a, b){
+function invItemLogHtml(pool, it, u){
+  const logs = invLogs(pool).filter(function(l){
+    return l.itemId === it.id || l.itemName === it.name;
+  }).slice().sort(function(a, b){
     return String(b.date).localeCompare(String(a.date)) || String(b.createdAt).localeCompare(String(a.createdAt));
   });
   if(!logs.length) return '';
@@ -3916,7 +3912,6 @@ function addRecord(){
   $('noteInput').value = '';
   $('donMaterialInput').value = '';
   $('donQtyInput').value = '';
-  $('commonNoteSelect').value = '';
   err.textContent = '';
   selectedIds.clear();
   renderAll(true);
@@ -4460,16 +4455,7 @@ function bindEvents(){
     cloudOnline = false;
     cloudStart();
   });
-  $('cloudHelpBtn').addEventListener('click', function(){
-    openOverlay('cloudHelpOverlay');
-  });
   $('cloudCopyEnvBtn').addEventListener('click', copyCloudEnv);
-  $('cloudSetupBtn').addEventListener('click', function(){
-    $('cloudSetupError').textContent = '';
-    $('supUrlInput').value = readLS('catSupabaseUrl') || '';
-    $('supKeyInput').value = readLS('catSupabaseKey') || '';
-    openOverlay('cloudSetupOverlay');
-  });
   $('cloudConnectBtn').addEventListener('click', saveAndConnectSupabase);
 
   $('ledgerForm').addEventListener('submit', function(e){
@@ -4705,11 +4691,6 @@ function bindEvents(){
   updateAmountHint();
   rebuildCategoryOptions();
 
-  $('commonNoteSelect').addEventListener('change', function(){
-    const val = $('commonNoteSelect').value;
-    if(val) $('noteInput').value = val;
-  });
-
   $('recordListBody').addEventListener('change', function(e){
     const cb = e.target.closest('.row-checkbox');
     if(!cb) return;
@@ -4755,12 +4736,6 @@ function bindEvents(){
   });
 
   $('exportCsvBtn').addEventListener('click', exportCSV);
-  $('exportJsonBtn').addEventListener('click', exportJSON);
-  $('importJsonBtn').addEventListener('click', function(){ $('importJsonInput').click(); });
-  $('importJsonInput').addEventListener('change', function(){
-    const file = $('importJsonInput').files[0];
-    if(file) importJSON(file);
-  });
 
   document.querySelectorAll('[data-close]').forEach(function(btn){
     btn.addEventListener('click', function(){ closeOverlay(btn.dataset.close); });
