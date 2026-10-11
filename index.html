@@ -1001,6 +1001,7 @@ footer{
     <span id="cloudBarIcon">☁️</span>
     <span id="cloudBarText">正在连接云数据库…</span>
     <span class="cloud-bar-actions">
+      <button type="button" id="cloudFixBtn" class="cloud-btn hidden">🔧 怎么恢复</button>
       <button type="button" id="cloudRetryBtn" class="cloud-btn">重试连接</button>
     </span>
   </div>
@@ -1366,6 +1367,41 @@ create policy "anon delete cats" on storage.objects for delete using (bucket_id 
     <div class="modal-actions">
       <button type="button" class="btn ghost" data-close="cloudHelpOverlay">关闭</button>
       <button type="button" class="btn primary" id="cloudCopyEnvBtn">复制 Supabase 地址</button>
+    </div>
+  </div>
+</div>
+
+<!-- 数据库连不上 → 恢复指引 -->
+<div class="modal-overlay" id="cloudFixOverlay">
+  <div class="modal modal-wide">
+    <h3>🔧 共用数据连不上，怎么恢复？</h3>
+    <p class="modal-sub" id="cloudFixReason">
+      最常见的原因：免费的 Supabase 项目超过 7 天没人访问，被官方自动「暂停」了。唤醒一下就能继续用，
+      原来的账目、猫咪档案、物资库存都还在。
+    </p>
+    <p class="modal-note" style="background:#EAF7EF;border-color:#B9E3C9;color:#25623F;">
+      ✅ 本机数据是安全的：这台设备上的记账、猫咪档案、物资库存此刻都完整保存着。
+      重新连上数据库后会自动同步上去，不会丢。
+    </p>
+    <ol class="cloud-help-steps">
+      <li>打开 <a href="https://supabase.com/dashboard/projects" target="_blank" rel="noopener">supabase.com/dashboard/projects</a>，用当初注册的邮箱登录。</li>
+      <li>在项目列表里找到原来的项目，它会显示 <b>Paused</b>（已暂停）。</li>
+      <li>点进这个项目，点页面上的 <b>Restore project</b>（恢复项目），等 1～3 分钟，状态变回 <b>Active</b> 即可。</li>
+      <li>回到本页，点下面的「我已恢复，重试连接」。连上后状态条会变绿。</li>
+    </ol>
+    <p class="modal-note">
+      <b>怎么避免以后又被暂停？</b>免费项目连续 7 天没人访问就会暂停。
+      只要 <b>每 7 天至少打开一次这个网页</b>（打开就会自动连一次数据库），就不会再被暂停。
+    </p>
+    <p class="modal-note">
+      <b>项目列表里已经找不到它？</b>（暂停超过 90 天会被官方删除）那就新建一个：
+      点下面的「⚙️ 更换数据库地址」，按提示创建新项目并粘贴地址和 Key，本机数据会自动上传到新项目。
+      建新项目的详细步骤见 <a href="#" id="cloudFixHelpLink">「开启共用数据」说明</a>。
+    </p>
+    <div class="modal-actions">
+      <button type="button" class="btn ghost" data-close="cloudFixOverlay">关闭</button>
+      <button type="button" class="btn ghost" id="cloudFixChangeBtn">⚙️ 更换数据库地址</button>
+      <button type="button" class="btn primary" id="cloudFixRetryBtn">我已恢复，重试连接</button>
     </div>
   </div>
 </div>
@@ -2810,8 +2846,32 @@ function renderCharts(){
 
 /* ---------- Supabase 共用数据 ---------- */
 const CLOUD_BLANK_GIF = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
+let supPausedSuspect = false;
+let supLastTryAt = 0;
+let cloudRetryTimer = null;
+let cloudRetryDelay = 15000;
+async function supOtherHostReachable(){
+  try{
+    await fetch('https://supabase.com/favicon.ico?ts=' + Date.now(), {mode:'no-cors', cache:'no-store'});
+    return true;
+  }catch(e){ return false; }
+}
+async function supExplainFailure(e){
+  if(e && e.supNetErr){
+    const netOk = await supOtherHostReachable();
+    if(netOk){
+      supPausedSuspect = true;
+      return '数据库域名失效——免费的 Supabase 项目长时间没人访问会被自动「暂停」。点左侧「🔧 怎么恢复」照三步唤醒即可，本机数据不会丢';
+    }
+    supPausedSuspect = false;
+    return '这台设备连不上外网，请检查 Wi-Fi／流量后点「重试连接」';
+  }
+  supPausedSuspect = false;
+  return cloudErrorMessage(e);
+}
 function cloudErrorMessage(e){
   const msg = String((e && (e.message || e.errMsg || e)) || e || '');
+  if(/ERR_NAME_NOT_RESOLVED|NAME_NOT_RESOLVED|UNKNOWN_HOST|无法解析|域名|DNS/i.test(msg)) return '数据库域名解析不了——项目很可能被 Supabase 暂停了，点「🔧 怎么恢复」按提示唤醒即可';
   if(/could not find.*table|relation .* does not exist|PGRST205|does not exist/i.test(msg)) return '数据表还没有建：请照「查看开通步骤」里的 SQL，在 Supabase 的 SQL 编辑器里运行一次';
   if(/JWT|apikey|invalid key|invalid apikey|API key|401|unauthorized|not authorized/i.test(msg)) return 'Supabase 地址或 Key 不对，请检查 Settings → API 里的 Project URL 和 anon public key';
   if(/permission|权限|forbidden|denied|policy|row-level security|RLS/i.test(msg)) return 'Supabase 表的权限（RLS 策略）没设好：「查看开通步骤」里的 SQL 已包含它们，运行一次即可';
@@ -2826,6 +2886,8 @@ function setCloudBar(mode, text){
   bar.style.display = 'flex';
   $('cloudBarIcon').textContent = mode === 'online' ? '✅' : (mode === 'connecting' ? '⏳' : '⚠️');
   $('cloudBarText').textContent = text;
+  const fixBtn = $('cloudFixBtn');
+  if(fixBtn) fixBtn.classList.toggle('hidden', mode !== 'offline');
 }
 function supabaseUrl(){
   return readLS('catSupabaseUrl') || SUPABASE_URL;
@@ -2848,10 +2910,18 @@ async function supFetch(path, opts){
   opts = opts || {};
   opts.headers = Object.assign(supHeaders(), opts.headers || {});
   let res;
+  const ctl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+  const timer = ctl ? setTimeout(function(){ try{ ctl.abort(); }catch(_e){} }, 25000) : null;
+  if(ctl && !opts.signal) opts.signal = ctl.signal;
   try{
     res = await fetch(supabaseUrl() + path, opts);
   }catch(e){
-    throw new Error('连接不上 Supabase，请检查网络后重试');
+    const err = new Error('连接不上 Supabase（网络或域名不可达）');
+    err.supNetErr = true;
+    err.cause = e;
+    throw err;
+  }finally{
+    if(timer) clearTimeout(timer);
   }
   const text = await res.text();
   let data = null;
@@ -2865,9 +2935,13 @@ async function supFetch(path, opts){
 async function cloudStart(){
   if(cloudPendingLogin) return;
   cloudPendingLogin = true;
+  clearTimeout(cloudRetryTimer);
+  supLastTryAt = Date.now();
   if(!supConfigured()){
     cloudOnline = false;
-    setCloudBar('offline', '⚠️ 还没连接共用数据：点「⚙️ 填 Key」粘贴你的 Supabase 地址和 Key，或看「查看开通步骤」。当前数据仅保存在本机。');
+    cloudApp = null;
+    supPausedSuspect = false;
+    setCloudBar('offline', '⚠️ 还没连接共用数据：当前数据只保存在本机。点「🔧 怎么恢复」可以看到开通／恢复的方法。');
     cloudPendingLogin = false;
     return;
   }
@@ -2877,16 +2951,31 @@ async function cloudStart(){
     await supFetch('/rest/v1/records?select=id&limit=1');
     cloudApp = { supabase: true };
     cloudOnline = true;
+    supPausedSuspect = false;
+    cloudRetryDelay = 15000;
     await cloudBootstrap();
     setCloudBar('online', '☁️ 已连接 Supabase：收支、猫咪、预算、管理员账号会在所有设备间自动同步');
     scheduleCloudPoll();
   }catch(e){
     console.error('Supabase 连接失败：', e);
     cloudOnline = false;
-    setCloudBar('offline', '⚠️ 共用数据连接失败：' + cloudErrorMessage(e) + '。按「查看开通步骤」可看怎么建表，改好后点「重试连接」。');
+    cloudApp = null;
+    const reason = await supExplainFailure(e);
+    setCloudBar('offline', '⚠️ 共用数据连接失败：' + reason + '。');
+    scheduleCloudRetry();
   }finally{
     cloudPendingLogin = false;
   }
+}
+function scheduleCloudRetry(){
+  clearTimeout(cloudRetryTimer);
+  const delay = cloudRetryDelay;
+  cloudRetryDelay = Math.min(Math.round(cloudRetryDelay * 1.4), 120000);
+  cloudRetryTimer = setTimeout(function(){
+    if(cloudOnline) return;
+    if(document.hidden){ scheduleCloudRetry(); return; }
+    cloudStart();
+  }, delay);
 }
 async function cloudEnsureLogin(){ /* Supabase 无需登录，直接走 anon key */ }
 async function cloudDocGet(colName, id){
@@ -3335,7 +3424,25 @@ function saveAndConnectSupabase(){
   closeOverlay('cloudSetupOverlay');
   err.textContent = '';
   cloudOnline = false;
+  cloudApp = null;
+  cloudRetryDelay = 8000;
   cloudStart();
+}
+function prefillCloudSetup(){
+  const u = $('supUrlInput'), k = $('supKeyInput');
+  if(u && !String(u.value || '').trim()) u.value = supabaseUrl();
+  if(k && !String(k.value || '').trim()) k.value = supabaseKey();
+}
+function openCloudFix(){
+  const reason = $('cloudFixReason');
+  if(reason){
+    if(supPausedSuspect){
+      reason.textContent = '现在连不上共用数据：数据库域名已失效。最常见的原因是——免费的 Supabase 项目超过 7 天没人访问，被官方自动「暂停」了。按下面三步唤醒一下就能继续用，原来的账目、猫咪档案、物资库存都还在。';
+    }else{
+      reason.textContent = '现在连不上共用数据。可能是：免费的 Supabase 项目被自动「暂停」了、地址/Key 变了、或者还没开通。按下面的步骤检查即可；不确定时先试第 1～4 步（唤醒项目）。';
+    }
+  }
+  openOverlay('cloudFixOverlay');
 }
 function copyCloudEnv(){
   const text = supabaseUrl();
@@ -4234,12 +4341,14 @@ function importJSON(file){
     }catch(e){
       alert('导入失败：文件内容不是有效的Xaiu猫猫守护团 JSON 备份');
     }finally{
-      $('importJsonInput').value = '';
+      const inp = $('importJsonInput');
+      if(inp) inp.value = '';
     }
   };
   reader.onerror = function(){
     alert('读取文件失败');
-    $('importJsonInput').value = '';
+    const inp2 = $('importJsonInput');
+    if(inp2) inp2.value = '';
   };
   reader.readAsText(file, 'UTF-8');
 }
@@ -4500,7 +4609,27 @@ function bindEvents(){
   $('copyShareUrlBtn').addEventListener('click', copyShareUrl);
   $('cloudRetryBtn').addEventListener('click', function(){
     cloudOnline = false;
+    cloudApp = null;
+    cloudRetryDelay = 8000;
     cloudStart();
+  });
+  $('cloudFixBtn').addEventListener('click', openCloudFix);
+  $('cloudFixRetryBtn').addEventListener('click', function(){
+    closeOverlay('cloudFixOverlay');
+    cloudOnline = false;
+    cloudApp = null;
+    cloudRetryDelay = 8000;
+    cloudStart();
+  });
+  $('cloudFixChangeBtn').addEventListener('click', function(){
+    closeOverlay('cloudFixOverlay');
+    prefillCloudSetup();
+    openOverlay('cloudSetupOverlay');
+  });
+  $('cloudFixHelpLink').addEventListener('click', function(ev){
+    ev.preventDefault();
+    closeOverlay('cloudFixOverlay');
+    openOverlay('cloudHelpOverlay');
   });
   $('cloudCopyEnvBtn').addEventListener('click', copyCloudEnv);
   $('cloudConnectBtn').addEventListener('click', saveAndConnectSupabase);
@@ -4790,7 +4919,7 @@ function bindEvents(){
 
   document.addEventListener('keydown', function(e){
     if(e.key === 'Escape'){
-      ['cloudSetupOverlay','cloudHelpOverlay','shareOverlay','loginOverlay','pwdOverlay','recycleOverlay','receiptOverlay','adminAccountsOverlay','renameOverlay','catEditorOverlay','invItemModal','invInModal','invOutModal','recordEditModal','confirmModal','invLogEditModal'].forEach(function(id){
+      ['cloudSetupOverlay','cloudHelpOverlay','cloudFixOverlay','shareOverlay','loginOverlay','pwdOverlay','recycleOverlay','receiptOverlay','adminAccountsOverlay','renameOverlay','catEditorOverlay','invItemModal','invInModal','invOutModal','recordEditModal','confirmModal','invLogEditModal'].forEach(function(id){
         if($(id).classList.contains('open')) closeOverlay(id);
       });
     }
@@ -4818,6 +4947,15 @@ function init(){
 }
 init();
 cloudStart();
+window.addEventListener('online', function(){
+  if(!cloudOnline && !cloudPendingLogin){ cloudRetryDelay = 8000; cloudStart(); }
+});
+document.addEventListener('visibilitychange', function(){
+  if(document.hidden || cloudOnline || cloudPendingLogin) return;
+  if(Date.now() - supLastTryAt < 8000) return;
+  cloudRetryDelay = 8000;
+  cloudStart();
+});
 if('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')){
   window.addEventListener('load', function(){
     navigator.serviceWorker.register('sw.js').catch(function(){});
