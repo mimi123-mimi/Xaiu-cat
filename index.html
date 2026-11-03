@@ -1862,6 +1862,8 @@ const CLOUD_CONFIG_KEY = 'catCloudCacheV1';
 const CLOUD_URL_KEY = 'catCloudUrlCacheV1';
 const CLOUD_TOMB_KEY = 'catCloudTombstonesV1';
 const CLOUD_SEEN_KEY = 'catCloudSeenV1';
+const CLOUD_CONFIG_DIRTY_KEY = 'catCloudConfigDirtyV1';
+const INV_MUTATION_KEY = 'catInventoryMutationV1';
 const CLOUD_CFG_ID = 'main';
 const DEFAULT_PASSWORD = 'cat2026';
 const CATEGORIES = ['猫粮','罐头','绝育','医疗','义卖','捐款','捐赠','物资采购','其他'];
@@ -1886,7 +1888,9 @@ let cloudTombstones = loadCloudTombstones();
 let cloudSeen = loadCloudSeen();
 let cloudDirtyRecords = new Set();
 let cloudDirtyCats = new Set();
-let cloudConfigDirty = false;
+let cloudConfigDirty = readLS(CLOUD_CONFIG_DIRTY_KEY) === '1';
+let cloudInvMutationAt = String(readLS(INV_MUTATION_KEY) || '');
+let cloudMutationEpoch = 0;
 let cloudFlushTimer = null;
 let cloudPollTimer = null;
 let cloudFlushing = false;
@@ -1898,9 +1902,9 @@ const PUB_INVLOG_KEY = 'catPublicInvLogs';
 const FOS_INV_KEY = 'catFosterInv';
 const FOS_INVLOG_KEY = 'catFosterInvLogs';
 let publicInv = loadInv(PUB_INV_KEY);
-let publicInvLogs = loadInv(PUB_INVLOG_KEY);
+let publicInvLogs = loadInv(PUB_INVLOG_KEY, normalizeInvLog);
 let fosterInv = loadInv(FOS_INV_KEY);
-let fosterInvLogs = loadInv(FOS_INVLOG_KEY);
+let fosterInvLogs = loadInv(FOS_INVLOG_KEY, normalizeInvLog);
 let catFilter = 'all';
 let catsCollapsed = false;
 let invCurPool = 'public';
@@ -1967,6 +1971,16 @@ function loadCloudConfigCache(){
     return {
       admins: Array.isArray(obj.admins) ? obj.admins : [],
       budget: Object.prototype.hasOwnProperty.call(obj, 'budget') ? obj.budget : null,
+      publicInv: Array.isArray(obj.publicInv) ? obj.publicInv : null,
+      publicInvLogs: Array.isArray(obj.publicInvLogs) ? obj.publicInvLogs : null,
+      fosterInv: Array.isArray(obj.fosterInv) ? obj.fosterInv : null,
+      fosterInvLogs: Array.isArray(obj.fosterInvLogs) ? obj.fosterInvLogs : null,
+      recordsBackup: Array.isArray(obj.recordsBackup) ? obj.recordsBackup : null,
+      publicInvBackup: Array.isArray(obj.publicInvBackup) ? obj.publicInvBackup : null,
+      publicInvLogsBackup: Array.isArray(obj.publicInvLogsBackup) ? obj.publicInvLogsBackup : null,
+      fosterInvBackup: Array.isArray(obj.fosterInvBackup) ? obj.fosterInvBackup : null,
+      fosterInvLogsBackup: Array.isArray(obj.fosterInvLogsBackup) ? obj.fosterInvLogsBackup : null,
+      invMutationAt: String(obj.invMutationAt || ''),
       updatedAt: String(obj.updatedAt || ''),
       lastConnectedAt: String(obj.lastConnectedAt || '')
     };
@@ -1976,6 +1990,19 @@ function saveCloudConfigCache(obj){
   try{
     localStorage.setItem(CLOUD_CONFIG_KEY, JSON.stringify(obj || cloudConfigCache));
   }catch(e){}
+}
+function markCloudConfigDirty(){
+  cloudMutationEpoch += 1;
+  cloudConfigDirty = true;
+  try{ localStorage.setItem(CLOUD_CONFIG_DIRTY_KEY, '1'); }catch(e){}
+}
+function clearCloudConfigDirty(){
+  cloudConfigDirty = false;
+  try{ localStorage.removeItem(CLOUD_CONFIG_DIRTY_KEY); }catch(e){}
+}
+function markInventoryMutation(){
+  cloudInvMutationAt = new Date().toISOString();
+  try{ localStorage.setItem(INV_MUTATION_KEY, cloudInvMutationAt); }catch(e){}
 }
 function loadCloudUrlCache(){
   try{
@@ -2044,12 +2071,16 @@ function clearTombstone(kind, id){
   if(cloudTombstones[kind][id]){
     delete cloudTombstones[kind][id];
     saveCloudTombstones();
+    // 删除标记也必须同步更新，否则其他设备会继续把已恢复的数据删掉。
+    markCloudConfigDirty();
+    if(cloudApp) scheduleCloudSync();
   }
 }
 function cloudNoteHardRemove(kind, id){
-  if(!cloudApp || !id) return;
+  if(!id) return;
   rememberTombstone(kind, id);
-  scheduleCloudSync(500);
+  markCloudConfigDirty();
+  if(cloudApp) scheduleCloudSync(500);
 }
 function getAdminAccounts(){
   let list = [];
@@ -2089,7 +2120,7 @@ function saveAdminAccounts(list){
     });
     cloudConfigCache.updatedAt = new Date().toISOString();
     saveCloudConfigCache(cloudConfigCache);
-    cloudConfigDirty = true;
+    markCloudConfigDirty();
     scheduleCloudSync(600);
   }
 }
@@ -2142,7 +2173,7 @@ function setBudgetValue(text){
     cloudConfigCache.budget = (rawText !== '' && isFinite(num) && num > 0) ? Math.round(num * 100) / 100 : null;
     cloudConfigCache.updatedAt = new Date().toISOString();
     saveCloudConfigCache(cloudConfigCache);
-    cloudConfigDirty = true;
+    markCloudConfigDirty();
     scheduleCloudSync(600);
   }
 }
@@ -2256,6 +2287,7 @@ function loadRecords(){
 }
 function saveRecords(){
   writeLS(STORAGE_KEY, JSON.stringify(records));
+  markCloudConfigDirty();
   if(cloudApp){
     records.forEach(function(r){ cloudDirtyRecords.add(r.id); });
     scheduleCloudSync();
@@ -3036,6 +3068,14 @@ function cloudRecordPayload(r){
     deleted: !!r.deleted
   };
 }
+function cloudRecordBackupPayload(r){
+  return Object.assign({}, cloudRecordPayload(r), {
+    invLink: (r.invLink && r.invLink.pool && r.invLink.logId)
+      ? {pool: r.invLink.pool === 'foster' ? 'foster' : 'public', logId: String(r.invLink.logId)}
+      : null,
+    invBackup: (r.invBackup && r.invBackup.pool) ? r.invBackup : null
+  });
+}
 function isCloudFileId(src){
   return typeof src === 'string' &&
     (src.indexOf('cloud://') === 0 ||
@@ -3120,6 +3160,18 @@ async function flushCloud(){
   if(!cloudApp || !cloudOnline || cloudFlushing) return;
   cloudFlushing = true;
   try{
+    if(cloudConfigDirty){
+      // 写入整套配置前先取云端最新快照，按记录时间、库存变更版本和删除标记
+      // 合并一次，避免旧设备把其他设备刚保存的账目或库存覆盖掉。
+      const requestEpoch = cloudMutationEpoch;
+      const remoteCfg = await cloudDocGet('config', CLOUD_CFG_ID);
+      if(remoteCfg){
+        cloudAdoptConfig(remoteCfg, false, requestEpoch);
+        if(Array.isArray(remoteCfg.recordsBackup)){
+          mergeCloudRecords(remoteCfg.recordsBackup);
+        }
+      }
+    }
     const recIds = Array.from(cloudDirtyRecords);
     for(const id of recIds){
       const found = findRecord(id);
@@ -3139,7 +3191,6 @@ async function flushCloud(){
         continue;
       }
       await cloudDocRemove('records', id);
-      clearTombstone('records', id);
     }
     const catIds = Array.from(cloudDirtyCats);
     for(const id of catIds){
@@ -3161,19 +3212,44 @@ async function flushCloud(){
         continue;
       }
       await cloudDocRemove('cats', id);
-      clearTombstone('cats', id);
     }
-    if(cloudConfigDirty && cloudConfigCache){
+    if(cloudConfigDirty){
       const cfg = buildCloudConfigObject();
       await cloudDocSet('config', CLOUD_CFG_ID, cfg);
-      cloudConfigCache.updatedAt = cfg.updatedAt;
+      const latest = buildCloudConfigObject();
+      const syncedKeys = ['admins','budget','recordsBackup','recordTombstones','catTombstones','publicInv','publicInvLogs','fosterInv','fosterInvLogs','publicInvBackup','publicInvLogsBackup','fosterInvBackup','fosterInvLogsBackup','invMutationAt'];
+      const unchangedDuringUpload = syncedKeys.every(function(key){
+        return JSON.stringify(cfg[key]) === JSON.stringify(latest[key]);
+      });
+      cloudConfigCache = {
+        admins: cfg.admins,
+        budget: cfg.budget,
+        publicInv: cfg.publicInv,
+        publicInvLogs: cfg.publicInvLogs,
+        fosterInv: cfg.fosterInv,
+        fosterInvLogs: cfg.fosterInvLogs,
+        recordsBackup: cfg.recordsBackup,
+        publicInvBackup: cfg.publicInvBackup,
+        publicInvLogsBackup: cfg.publicInvLogsBackup,
+        fosterInvBackup: cfg.fosterInvBackup,
+        fosterInvLogsBackup: cfg.fosterInvLogsBackup,
+        invMutationAt: cfg.invMutationAt,
+        updatedAt: cfg.updatedAt,
+        lastConnectedAt: new Date().toISOString()
+      };
       saveCloudConfigCache(cloudConfigCache);
-      cloudConfigDirty = false;
+      if(unchangedDuringUpload){
+        clearCloudConfigDirty();
+      }else{
+        markCloudConfigDirty();
+        scheduleCloudSync(350);
+      }
     }
   }catch(e){
     console.error('云同步失败：', e);
     cloudOnline = false;
     setCloudBar('offline', '⚠️ 云同步暂时失败：' + cloudErrorMessage(e) + '。数据已安全保存在本机，可稍后点「重试连接」。');
+    scheduleCloudRetry();
   }finally{
     cloudFlushing = false;
   }
@@ -3192,22 +3268,168 @@ function normalizeCloudAdmins(list){
     };
   }).filter(function(a){ return a.name; });
 }
-function cloudAdoptConfig(cfg, firstSeed){
+function mergeSharedTombstones(kind, list){
+  if(!list || typeof list !== 'object' || Array.isArray(list)) return;
+  let changed = false;
+  Object.keys(list).forEach(function(id){
+    const incoming = String(list[id] || '');
+    if(!id || !incoming) return;
+    const current = String(cloudTombstones[kind][id] || '');
+    if(!current || incoming > current){
+      cloudTombstones[kind][id] = incoming;
+      changed = true;
+    }
+  });
+  if(changed) saveCloudTombstones();
+}
+function inventoryFieldHasData(value){
+  return Array.isArray(value) && value.length > 0;
+}
+function mergeInventoryConfigValue(key, localValue, remoteValue, hasRemote, baseValue, conflict){
+  if(conflict.forceRemote) return hasRemote ? remoteValue : localValue;
+  if(conflict.forceLocal || conflict.forceLocalKeys[key]) return localValue;
+  const hasBase = baseValue !== null && baseValue !== undefined;
+  const localChanged = hasBase
+    ? JSON.stringify(baseValue) !== JSON.stringify(localValue)
+    : inventoryFieldHasData(localValue);
+  // 主数据和备份同时突然为空，但没有新的库存变更版本时视为短时同步异常。
+  if(inventoryFieldHasData(localValue) && !inventoryFieldHasData(remoteValue)){
+    return localValue;
+  }
+  return localChanged || !hasRemote ? localValue : remoteValue;
+}
+function mergePendingCloudConfig(remoteCfg, conflict){
+  conflict = conflict || {forceRemote:false, forceLocal:false, forceLocalKeys:{}};
+  const local = buildCloudConfigObject();
+  const base = cloudConfigCache || {};
+  const merged = {
+    recordsBackup: local.recordsBackup,
+    recordTombstones: local.recordTombstones,
+    catTombstones: local.catTombstones,
+    publicInvBackup: local.publicInvBackup,
+    publicInvLogsBackup: local.publicInvLogsBackup,
+    fosterInvBackup: local.fosterInvBackup,
+    fosterInvLogsBackup: local.fosterInvLogsBackup,
+    invMutationAt: conflict.forceRemote
+      ? String(remoteCfg.invMutationAt || '')
+      : String(local.invMutationAt || ''),
+    updatedAt: local.updatedAt
+  };
+  ['admins','budget'].forEach(function(key){
+    const hasBase = Object.prototype.hasOwnProperty.call(base, key) &&
+      base[key] !== null && base[key] !== undefined;
+    const hasRemote = Object.prototype.hasOwnProperty.call(remoteCfg, key);
+    const localValue = local[key];
+    let localChanged;
+    if(hasBase){
+      localChanged = JSON.stringify(base[key]) !== JSON.stringify(localValue);
+    }else if(Array.isArray(localValue)){
+      // 旧缓存没有库存快照时，本机非空数据优先；本机为空则允许从云端补回。
+      localChanged = localValue.length > 0;
+    }else{
+      localChanged = localValue !== null && localValue !== '';
+    }
+    merged[key] = localChanged || !hasRemote ? localValue : remoteCfg[key];
+  });
+  [
+    'publicInv','publicInvBackup',
+    'publicInvLogs','publicInvLogsBackup',
+    'fosterInv','fosterInvBackup',
+    'fosterInvLogs','fosterInvLogsBackup'
+  ].forEach(function(key){
+    merged[key] = mergeInventoryConfigValue(
+      key,
+      local[key],
+      remoteCfg[key],
+      Object.prototype.hasOwnProperty.call(remoteCfg, key),
+      Object.prototype.hasOwnProperty.call(base, key) ? base[key] : undefined,
+      conflict
+    );
+  });
+  return merged;
+}
+function cloudAdoptConfig(cfg, firstSeed, snapshotEpoch){
   if(!cfg || typeof cfg !== 'object') return;
-  const admins = normalizeCloudAdmins(cfg.admins);
-  const rawBudget = Object.prototype.hasOwnProperty.call(cfg, 'budget') ? cfg.budget : null;
+  // 如果读取云端快照期间本机发生了修改，这个响应已经过期。
+  // 即使新修改刚刚上传完成、dirty 已被清掉，也不能再让旧快照覆盖它。
+  const localChangedDuringRequest = typeof snapshotEpoch === 'number' &&
+    snapshotEpoch !== cloudMutationEpoch;
+  const remoteInventoryAt = String(cfg.invMutationAt || '');
+  const localInventoryAt = String(cloudInvMutationAt || '');
+  const remoteInventoryIsNewer = !!remoteInventoryAt &&
+    (!localInventoryAt || remoteInventoryAt > localInventoryAt);
+  const localInventoryIsNewer = !!localInventoryAt &&
+    (!remoteInventoryAt || localInventoryAt > remoteInventoryAt);
+  const conflict = {
+    forceRemote: remoteInventoryIsNewer,
+    forceLocal: localInventoryIsNewer || localChangedDuringRequest,
+    forceLocalKeys: {}
+  };
+  if(!firstSeed && (localInventoryIsNewer || localChangedDuringRequest)){
+    // 本机库存版本更新，说明有尚未上传的修改，必须优先保留并补传。
+    markCloudConfigDirty();
+  }
+  if(!firstSeed && !remoteInventoryIsNewer){
+    [
+      ['publicInv','publicInvBackup', publicInv],
+      ['publicInvLogs','publicInvLogsBackup', publicInvLogs],
+      ['fosterInv','fosterInvBackup', fosterInv],
+      ['fosterInvLogs','fosterInvLogsBackup', fosterInvLogs]
+    ].forEach(function(group){
+      const remoteHas = inventoryFieldHasData(cfg[group[0]]) ||
+        inventoryFieldHasData(cfg[group[1]]);
+      if(inventoryFieldHasData(group[2]) && !remoteHas){
+        // 主数据与备份同时为空，库存版本却没有前进：按异常空数据保护本机。
+        conflict.forceLocalKeys[group[0]] = true;
+        conflict.forceLocalKeys[group[1]] = true;
+        markCloudConfigDirty();
+      }
+    });
+  }
+  const preservePending = !firstSeed && (!!cloudConfigDirty || localChangedDuringRequest);
+  if(preservePending){
+    // 先吸收其他设备的明确删除标记，再合并本机尚未上传的修改。
+    mergeSharedTombstones('records', cfg.recordTombstones);
+    mergeSharedTombstones('cats', cfg.catTombstones);
+  }
+  const effective = preservePending ? mergePendingCloudConfig(cfg, conflict) : cfg;
+  mergeSharedTombstones('records', effective.recordTombstones);
+  mergeSharedTombstones('cats', effective.catTombstones);
+  const admins = normalizeCloudAdmins(effective.admins);
+  const rawBudget = Object.prototype.hasOwnProperty.call(effective, 'budget') ? effective.budget : null;
   const budgetNum = rawBudget === null || rawBudget === '' ? null : Number(rawBudget);
   const budget = (isFinite(budgetNum) && budgetNum > 0) ? Math.round(budgetNum * 100) / 100 : null;
-  const updatedAt = String(cfg.updatedAt || new Date().toISOString());
+  const updatedAt = String(effective.updatedAt || new Date().toISOString());
   // 库存与流水总是载入（保底，避免某些设备/手机上不显示明细）
-  if(Array.isArray(cfg.publicInv)){ publicInv = cfg.publicInv.map(normalizeInvItem).filter(Boolean); writeLS(PUB_INV_KEY, JSON.stringify(publicInv)); }
-  if(Array.isArray(cfg.publicInvLogs)){ publicInvLogs = cfg.publicInvLogs.map(normalizeInvLog).filter(Boolean); writeLS(PUB_INVLOG_KEY, JSON.stringify(publicInvLogs)); }
-  if(Array.isArray(cfg.fosterInv)){ fosterInv = cfg.fosterInv.map(normalizeInvItem).filter(Boolean); writeLS(FOS_INV_KEY, JSON.stringify(fosterInv)); }
-  if(Array.isArray(cfg.fosterInvLogs)){ fosterInvLogs = cfg.fosterInvLogs.map(normalizeInvLog).filter(Boolean); writeLS(FOS_INVLOG_KEY, JSON.stringify(fosterInvLogs)); }
-  if(cloudConfigCache &&
+  const publicInvSource = Array.isArray(effective.publicInv) && effective.publicInv.length
+    ? effective.publicInv
+    : effective.publicInvBackup;
+  const publicInvLogsSource = Array.isArray(effective.publicInvLogs) && effective.publicInvLogs.length
+    ? effective.publicInvLogs
+    : effective.publicInvLogsBackup;
+  const fosterInvSource = Array.isArray(effective.fosterInv) && effective.fosterInv.length
+    ? effective.fosterInv
+    : effective.fosterInvBackup;
+  const fosterInvLogsSource = Array.isArray(effective.fosterInvLogs) && effective.fosterInvLogs.length
+    ? effective.fosterInvLogs
+    : effective.fosterInvLogsBackup;
+  if(Array.isArray(publicInvSource)){ publicInv = publicInvSource.map(normalizeInvItem).filter(Boolean); writeLS(PUB_INV_KEY, JSON.stringify(publicInv)); }
+  if(Array.isArray(publicInvLogsSource)){ publicInvLogs = publicInvLogsSource.map(normalizeInvLog).filter(Boolean); writeLS(PUB_INVLOG_KEY, JSON.stringify(publicInvLogs)); }
+  if(Array.isArray(fosterInvSource)){ fosterInv = fosterInvSource.map(normalizeInvItem).filter(Boolean); writeLS(FOS_INV_KEY, JSON.stringify(fosterInv)); }
+  if(Array.isArray(fosterInvLogsSource)){ fosterInvLogs = fosterInvLogsSource.map(normalizeInvLog).filter(Boolean); writeLS(FOS_INVLOG_KEY, JSON.stringify(fosterInvLogs)); }
+  if(remoteInventoryAt && (!cloudInvMutationAt || remoteInventoryAt > cloudInvMutationAt)){
+    cloudInvMutationAt = remoteInventoryAt;
+    try{ localStorage.setItem(INV_MUTATION_KEY, cloudInvMutationAt); }catch(e){}
+  }
+  if(!preservePending && cloudConfigCache &&
     cloudConfigCache.updatedAt === updatedAt &&
     JSON.stringify(cloudConfigCache.admins) === JSON.stringify(admins) &&
-    Number(cloudConfigCache.budget) === Number(budget)){
+    Number(cloudConfigCache.budget) === Number(budget) &&
+    String(cloudConfigCache.invMutationAt || '') === String(effective.invMutationAt || '') &&
+    JSON.stringify(cloudConfigCache.publicInv || []) === JSON.stringify(effective.publicInv || []) &&
+    JSON.stringify(cloudConfigCache.publicInvLogs || []) === JSON.stringify(effective.publicInvLogs || []) &&
+    JSON.stringify(cloudConfigCache.fosterInv || []) === JSON.stringify(effective.fosterInv || []) &&
+    JSON.stringify(cloudConfigCache.fosterInvLogs || []) === JSON.stringify(effective.fosterInvLogs || [])){
     cloudConfigCache.lastConnectedAt = new Date().toISOString();
     saveCloudConfigCache(cloudConfigCache);
     renderInventory();
@@ -3217,6 +3439,16 @@ function cloudAdoptConfig(cfg, firstSeed){
   cloudConfigCache = {
     admins: admins,
     budget: budget,
+    publicInv: publicInv,
+    publicInvLogs: publicInvLogs,
+    fosterInv: fosterInv,
+    fosterInvLogs: fosterInvLogs,
+    recordsBackup: effective.recordsBackup || null,
+    publicInvBackup: effective.publicInvBackup || null,
+    publicInvLogsBackup: effective.publicInvLogsBackup || null,
+    fosterInvBackup: effective.fosterInvBackup || null,
+    fosterInvLogsBackup: effective.fosterInvLogsBackup || null,
+    invMutationAt: cloudInvMutationAt,
     updatedAt: updatedAt,
     lastConnectedAt: new Date().toISOString()
   };
@@ -3237,9 +3469,14 @@ function cloudAdoptConfig(cfg, firstSeed){
     renderAll(false);
   }
   renderInventory();
+  if(preservePending){
+    markCloudConfigDirty();
+    if(cloudApp) scheduleCloudSync(0);
+  }
 }
 function mergeCloudRecords(cloudItems){
   let changed = false;
+  cloudItems = Array.isArray(cloudItems) ? cloudItems : [];
   const localById = {};
   records.forEach(function(r){ localById[r.id] = r; });
   const cloudIds = {};
@@ -3264,12 +3501,15 @@ function mergeCloudRecords(cloudItems){
     }
   }
   records = records.filter(function(r){
-    if(cloudIds[r.id]) return true;
-    if(cloudSeen.records.has(r.id)){
+    if(isTombstoned('records', r.id, r.updatedAt)){
       changed = true;
       return false;
     }
+    if(cloudIds[r.id]) return true;
+    // 云端暂时没有不等于用户删除了记录。保留本机数据并重新上传，
+    // 避免数据库暂停、网络抖动或空查询把整本账误清空。
     cloudDirtyRecords.add(r.id);
+    markCloudConfigDirty();
     return true;
   });
   for(const id of Object.keys(cloudTombstones.records)){
@@ -3286,6 +3526,7 @@ function mergeCloudRecords(cloudItems){
 }
 function mergeCloudCats(cloudItems){
   let changed = false;
+  cloudItems = Array.isArray(cloudItems) ? cloudItems : [];
   const localById = {};
   cats.forEach(function(c){ localById[c.id] = c; });
   const cloudIds = {};
@@ -3316,11 +3557,12 @@ function mergeCloudCats(cloudItems){
     }
   }
   cats = cats.filter(function(c){
-    if(cloudIds[c.id]) return true;
-    if(cloudSeen.cats.has(c.id)){
+    if(isTombstoned('cats', c.id, c.updatedAt)){
       changed = true;
       return false;
     }
+    if(cloudIds[c.id]) return true;
+    // 猫咪档案同样只按明确的删除标记移除，绝不因为云端短时为空而删本机数据。
     cloudDirtyCats.add(c.id);
     return true;
   });
@@ -3336,7 +3578,48 @@ function mergeCloudCats(cloudItems){
     renderAll(false);
   }
 }
+function resolveCloudRecordSource(cfg, cloudItems){
+  const live = Array.isArray(cloudItems) ? cloudItems : [];
+  const backup = cfg && Array.isArray(cfg.recordsBackup)
+    ? cfg.recordsBackup.map(normalizeRecord).filter(Boolean)
+    : [];
+  if(!backup.length) return {items: live, fromBackup: false};
+
+  // records 表不保存物资关联字段，关联信息放在 config.recordsBackup。
+  // 实时记录和备份按 id 合并，既补全关联，也能在 records 表部分丢失时自动恢复。
+  const byId = {};
+  backup.forEach(function(rec){ byId[rec.id] = rec; });
+  live.forEach(function(raw){
+    const rec = normalizeRecord(raw);
+    if(!rec) return;
+    const old = byId[rec.id];
+    byId[rec.id] = Object.assign({}, old || {}, rec, {
+      invLink: rec.invLink || (old && old.invLink) || null,
+      invBackup: rec.invBackup || (old && old.invBackup) || null
+    });
+  });
+  return {items: Object.keys(byId).map(function(id){ return byId[id]; }), fromBackup: live.length === 0};
+}
+function queueRecordUploads(items){
+  for(const raw of (Array.isArray(items) ? items : [])){
+    const rec = normalizeRecord(raw);
+    if(!rec || isTombstoned('records', rec.id, rec.updatedAt)) continue;
+    cloudDirtyRecords.add(rec.id);
+  }
+}
+function mergeCloudRecordSource(cfg, cloudItems){
+  const source = resolveCloudRecordSource(cfg, cloudItems);
+  mergeCloudRecords(source.items);
+  if(source.fromBackup){
+    // records 表为空时，先从 config.recordsBackup 恢复，再立即补传回 records。
+    queueRecordUploads(source.items);
+    markCloudConfigDirty();
+    setCloudBar('connecting', '正在从云端安全备份恢复记账数据…');
+  }
+  return source;
+}
 async function cloudBootstrap(){
+  const configEpoch = cloudMutationEpoch;
   const cfg = await cloudDocGet('config', CLOUD_CFG_ID);
   if(!cfg){
     const now = new Date().toISOString();
@@ -3364,15 +3647,20 @@ async function cloudBootstrap(){
     }
     return;
   }
-  cloudAdoptConfig(cfg, false);
+  cloudAdoptConfig(cfg, false, configEpoch);
   const [cloudRecords, cloudCats] = await Promise.all([
     cloudColAll('records'),
     cloudColAll('cats')
   ]);
-  mergeCloudRecords(cloudRecords);
+  const recordSource = mergeCloudRecordSource(cfg, cloudRecords);
   mergeCloudCats(cloudCats);
   runLinkBackfill();
-  if(cloudDirtyRecords.size || cloudDirtyCats.size || cloudConfigDirty){
+  if(cloudDirtyRecords.size || cloudDirtyCats.size || cloudConfigDirty ||
+    recordSource.fromBackup ||
+    Object.keys(cloudTombstones.records).length || Object.keys(cloudTombstones.cats).length){
+    if(Object.keys(cloudTombstones.records).length || Object.keys(cloudTombstones.cats).length){
+      markCloudConfigDirty();
+    }
     await flushCloud();
   }
 }
@@ -3398,19 +3686,25 @@ async function cloudPoll(){
     if(cloudDirtyRecords.size || cloudDirtyCats.size || cloudConfigDirty){
       await flushCloud();
     }
+    const configEpoch = cloudMutationEpoch;
     const cfg = await cloudDocGet('config', CLOUD_CFG_ID);
-    if(cfg) cloudAdoptConfig(cfg, false);
+    if(cfg) cloudAdoptConfig(cfg, false, configEpoch);
     const [cloudRecords, cloudCats] = await Promise.all([
       cloudColAll('records'),
       cloudColAll('cats')
     ]);
-    mergeCloudRecords(cloudRecords);
+    mergeCloudRecordSource(cfg, cloudRecords);
     mergeCloudCats(cloudCats);
     runLinkBackfill();
     if(cloudDirtyRecords.size || cloudConfigDirty){ await flushCloud(); }
     cloudRefreshAllCatPhotos();
   }catch(e){
-    console.warn('后台数据同步失败（稍后自动重试）：', e);
+    console.error('后台数据同步失败（稍后自动重试）：', e);
+    if(cloudOnline){
+      cloudOnline = false;
+      setCloudBar('offline', '⚠️ 云同步暂时断开：数据仍安全保存在本机，正在自动重连。');
+      scheduleCloudRetry();
+    }
   }
 }
 function saveAndConnectSupabase(){
@@ -3458,12 +3752,14 @@ function copyCloudEnv(){
 }
 
 /* ---------- 物资库存 ---------- */
-function loadInv(key){
+function loadInv(key, normalizer){
   const raw = readLS(key);
   if(!raw) return [];
   try{
     const arr = JSON.parse(raw);
-    return Array.isArray(arr) ? arr.map(normalizeInvItem).filter(Boolean) : [];
+    return Array.isArray(arr)
+      ? arr.map(normalizer || normalizeInvItem).filter(Boolean)
+      : [];
   }catch(e){ return []; }
 }
 function normalizeInvItem(raw){
@@ -3515,7 +3811,8 @@ function saveInvState(pool){
   const st = invStateKeys(pool);
   writeLS(st.itemsKey, JSON.stringify(invItems(pool)));
   writeLS(st.logsKey, JSON.stringify(invLogs(pool)));
-  cloudConfigDirty = true;
+  markInventoryMutation();
+  markCloudConfigDirty();
   if(cloudApp) scheduleCloudSync();
   renderInventory();
 }
@@ -3826,10 +4123,21 @@ function buildCloudConfigObject(){
     admins: getAdminAccounts().map(function(a){
       return {name: String(a.name || ''), password: String(a.password || ''), createdAt: String(a.createdAt || '')};
     }),
+    recordsBackup: records.map(cloudRecordBackupPayload),
+    recordTombstones: cloudTombstones.records,
+    catTombstones: cloudTombstones.cats,
     publicInv: publicInv,
     publicInvLogs: publicInvLogs,
     fosterInv: fosterInv,
     fosterInvLogs: fosterInvLogs,
+    publicInvBackup: publicInv,
+    publicInvLogsBackup: publicInvLogs,
+    fosterInvBackup: fosterInv,
+    fosterInvLogsBackup: fosterInvLogs,
+    // 生成快照不能顺便推进库存版本，否则连续上传时版本会不断变化，
+    // 导致同步队列反复触发。只有真实出入库或删除动作才推进这个时间。
+    invMutationAt: cloudInvMutationAt ||
+      String((cloudConfigCache && cloudConfigCache.invMutationAt) || ''),
     updatedAt: new Date().toISOString()
   };
 }
@@ -3958,7 +4266,7 @@ function runLinkBackfill(){
   writeLS(PUB_INVLOG_KEY, JSON.stringify(publicInvLogs));
   writeLS(FOS_INV_KEY, JSON.stringify(fosterInv));
   writeLS(FOS_INVLOG_KEY, JSON.stringify(fosterInvLogs));
-  if(cloudApp){ cloudConfigDirty = true; scheduleCloudSync(); }
+  if(cloudApp){ markCloudConfigDirty(); scheduleCloudSync(); }
 }
 function addRecord(){
   const date = $('recordDate').value;
@@ -4949,12 +5257,18 @@ init();
 cloudStart();
 window.addEventListener('online', function(){
   if(!cloudOnline && !cloudPendingLogin){ cloudRetryDelay = 8000; cloudStart(); }
+  else if(cloudOnline){ cloudPoll(); }
 });
 document.addEventListener('visibilitychange', function(){
-  if(document.hidden || cloudOnline || cloudPendingLogin) return;
+  if(document.hidden) return;
+  if(cloudOnline){ cloudPoll(); return; }
+  if(cloudPendingLogin) return;
   if(Date.now() - supLastTryAt < 8000) return;
   cloudRetryDelay = 8000;
   cloudStart();
+});
+window.addEventListener('focus', function(){
+  if(cloudOnline && !cloudPendingLogin) cloudPoll();
 });
 if('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')){
   window.addEventListener('load', function(){
