@@ -1091,7 +1091,7 @@ footer{
             <option value="医疗">医疗</option>
             <option value="义卖">义卖</option>
             <option value="爱心资助">爱心资助</option>
-            <option value="物资捐赠">物资捐赠</option>
+            <option value="捐赠">捐赠</option>
             <option value="物资采购">物资采购</option>
             <option value="其他">其他</option>
           </select>
@@ -1845,18 +1845,7 @@ const CLOUD_OPENING_BALANCE_DIRTY_KEY = 'catCloudOpeningBalanceDirtyV1';
 const INV_MUTATION_KEY = 'catInventoryMutationV1';
 const CLOUD_CFG_ID = 'main';
 const DEFAULT_PASSWORD = 'cat2026';
-const CATEGORIES = ['猫粮','罐头','绝育','医疗','义卖','爱心资助','物资捐赠','成员群收款','新成员入群','物资采购','其他'];
-
-function normalizeLedgerCategory(category){
-  const value = String(category || '').trim();
-  if(value === '捐款') return '爱心资助';
-  if(value === '捐赠') return '物资捐赠';
-  return CATEGORIES.indexOf(value) >= 0 ? value : '其他';
-}
-
-function isMaterialDonationCategory(category){
-  return normalizeLedgerCategory(category) === '物资捐赠';
-}
+const CATEGORIES = ['猫粮','罐头','绝育','医疗','义卖','捐款','爱心资助','捐赠','成员群收款','新成员入群','物资采购','其他'];
 
 const $ = (id) => document.getElementById(id);
 let records = loadRecords();
@@ -1918,16 +1907,11 @@ function currentMonthKey(){
 function reportMonthKey(){
   const current = currentMonthKey();
   const monthKeys = records
-    .filter(function(r){
-      return !r.deleted &&
-        !isMaterialDonationCategory(r.category) &&
-        /^\d{4}-\d{2}-\d{2}$/.test(String(r.date || ''));
-    })
+    .filter(function(r){ return !r.deleted && /^\d{4}-\d{2}-\d{2}$/.test(String(r.date || '')); })
     .map(function(r){ return monthKeyOf(r.date); })
     .filter(function(key){ return /^\d{4}-\d{2}$/.test(key); })
     .sort();
-  if(!monthKeys.length) return current;
-  if(monthKeys.indexOf(current) >= 0) return current;
+  if(!monthKeys.length || monthKeys.indexOf(current) >= 0) return current;
   return monthKeys[monthKeys.length - 1];
 }
 function monthKeyOf(dateStr){
@@ -2299,11 +2283,13 @@ function normalizeRecord(raw){
   if(!raw || typeof raw !== 'object') return null;
   const type = (raw.type === 'income') ? 'income' : 'expense';
   const amount = Math.abs(parseFloat(raw.amount)) || 0;
-  const category = normalizeLedgerCategory(raw.category);
   if(!isFinite(amount) || amount < 0) return null;
-  if(amount === 0 && ['物资捐赠','爱心资助'].indexOf(category) < 0) return null;
+  if(amount === 0 && ['捐赠','爱心资助','捐款'].indexOf(raw.category) < 0) return null;
   const date = String(raw.date || '');
   if(!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+  const category = raw.category === '捐款'
+    ? '爱心资助'
+    : (CATEGORIES.indexOf(raw.category) >= 0 ? raw.category : '其他');
   return {
     id: String(raw.id || raw._id || genId()),
     type: type,
@@ -4128,7 +4114,7 @@ function addDonationRecord(itemName, donor, note, pool, logId){
   const now = new Date().toISOString();
   const recId = genId();
   records.push({
-    id: recId, type: 'income', category: '物资捐赠',
+    id: recId, type: 'income', category: '捐赠',
     amount: 0, donor: donor || '',
     note: '【物资捐赠：' + itemName + '】' + (note ? '（' + note + '）' : ''),
     date: todayStr(), createdAt: now, updatedAt: now, deleted: false,
@@ -4171,8 +4157,8 @@ function renderRecords(){
 
   const rows = list.map(function(r){
     const checked = selectedIds.has(r.id);
-    const noAmount = Number(r.amount) === 0 && isMaterialDonationCategory(r.category);
-    const typeLabel = noAmount ? '物资捐赠' : (r.type === 'income' ? '收入' : '支出');
+    const noAmount = Number(r.amount) === 0 && r.category === '捐赠';
+    const typeLabel = noAmount ? '捐赠' : (r.type === 'income' ? '收入' : '支出');
     const badgeType = noAmount ? '' : r.type;
     const donorHtml = r.donor ? '<span style="color:#A84F12;">[' + escapeHtml(r.donor) + ']</span> ' : '';
     const noteHtml = donorHtml + (r.note ? escapeHtml(r.note) : (r.donor ? '' : '<span style="color:#C0AA93">—</span>'));
@@ -4209,7 +4195,7 @@ function updateRecycleButtonCount(){
 }
 
 const EXPENSE_CATS = ['猫粮','罐头','绝育','医疗','物资采购','其他'];
-const INCOME_CATS = ['爱心资助','物资捐赠','成员群收款','新成员入群','其他'];
+const INCOME_CATS = ['爱心资助','捐赠','成员群收款','新成员入群','其他'];
 function rebuildCategoryOptions(){
   const sel = $('categorySelect');
   const type = $('typeSelect').value;
@@ -4222,9 +4208,9 @@ function onCategoryChange(){
   const type = $('typeSelect').value;
   const cat = $('categorySelect').value;
   const materialExpense = type === 'expense' && ['猫粮','罐头','物资采购','其他'].indexOf(cat) >= 0;
-  const isDon = isMaterialDonationCategory(cat);
-  const show = isDon || materialExpense;
+  const show = cat === '捐赠' || materialExpense;
   $('donationInvFields').style.display = show ? '' : 'none';
+  const isDon = cat === '捐赠';
   $('donBoxLabel').textContent = isDon ? '🧺 物资捐赠入库（选填）' : '🧺 物资入库（选填）';
   $('donBoxNote').textContent = isDon
     ? '填写后会自动加入对应物资库存（只加库存，不产生支出）。'
@@ -4266,7 +4252,7 @@ function linkExistingRecords(){
       if(r.invLink) return;
       const name = extractInvNameFromRecord(r);
       if(!name) return;
-      const wantType = isMaterialDonationCategory(r.category) ? 'donation' : 'purchase';
+      const wantType = r.category === '捐赠' ? 'donation' : 'purchase';
       const log = logs.find(function(l){
         if(l.recLink === r.id) return true;
         return !l.recLink && l.itemName === name && l.type === wantType && String(l.date) === String(r.date);
@@ -4320,7 +4306,7 @@ function addRecord(){
     err.textContent = '金额无效';
     return;
   }
-  if(rawAmount === 0 && ['物资捐赠','爱心资助'].indexOf(category) < 0){
+  if(rawAmount === 0 && ['捐赠','爱心资助'].indexOf(category) < 0){
     err.textContent = '请输入大于 0 的金额（捐赠物资可不填金额）';
     return;
   }
@@ -4346,7 +4332,7 @@ function addRecord(){
   const qty = parseFloat($('donQtyInput').value) || 0;
   if(material && qty > 0){
     const pool = $('donPoolSelect').value;
-    const kind = isMaterialDonationCategory(category) ? 'donation' : 'purchase';
+    const kind = category === '捐赠' ? 'donation' : 'purchase';
     const logId = materialInboundToInventory(pool, material, qty, kind, donor, note, recId);
     const rec = findRecord(recId);
     if(rec) rec.record.invLink = {pool: pool, logId: logId};
@@ -4469,7 +4455,7 @@ function saveRecordEdit(){
     if(!donor){ err.textContent = '类型为“爱心资助”时必须填写捐款人'; return; }
     if(!isFinite(amount) || amount <= 0){ err.textContent = '类型为“爱心资助”时请填写收入金额'; return; }
   }
-  if(amount === 0 && ['物资捐赠','爱心资助'].indexOf(category) < 0){
+  if(amount === 0 && ['捐赠','爱心资助'].indexOf(category) < 0){
     err.textContent = '金额需大于 0（捐赠物资可留空金额）';
     return;
   }
@@ -4627,28 +4613,18 @@ function excelColumnWidth(header, values, minWidth, maxWidth){
 }
 function exportCSV(){
   const reportMonth = reportMonthKey();
-  const monthRecords = records.filter(function(r){
+  const sorted = records.filter(function(r){
     return !r.deleted && monthKeyOf(r.date) === reportMonth;
   }).sort(function(a,b){
     return a.date.localeCompare(b.date) || String(a.createdAt).localeCompare(String(b.createdAt));
   });
-  const materialDonations = monthRecords.filter(function(r){
-    return isMaterialDonationCategory(r.category);
-  });
-  const sorted = monthRecords.filter(function(r){
-    return !isMaterialDonationCategory(r.category);
-  });
-  const hasDonor = monthRecords.some(function(r){ return String(r.donor || '').trim() !== ''; });
+  const hasDonor = sorted.some(function(r){ return String(r.donor || '').trim() !== ''; });
   const columns = ['日期','类别'];
   if(hasDonor) columns.push('捐款人/捐赠人');
   columns.push('收入','支出','结余','备注');
-  const incomeIndex = hasDonor ? 3 : 2;
-  const expenseIndex = incomeIndex + 1;
-  const balanceIndex = incomeIndex + 2;
-  const noteIndex = columns.length - 1;
 
   const rows = sorted.map(function(r){
-    const categoryLabel = normalizeLedgerCategory(r.category);
+    const categoryLabel = r.category === '捐款' ? '爱心资助' : r.category;
     const row = [r.date, categoryLabel];
     if(hasDonor) row.push(r.donor || '');
     row.push(
@@ -4660,17 +4636,8 @@ function exportCSV(){
     return row;
   });
 
-  const materialRows = materialDonations.map(function(r){
-    const row = new Array(columns.length).fill('');
-    row[0] = r.date;
-    row[1] = r.note || '';
-    if(hasDonor) row[2] = r.donor || '';
-    row[incomeIndex] = '物资捐赠';
-    return row;
-  });
-  const widthRows = rows.concat(materialRows);
   const widths = columns.map(function(label, columnIndex){
-    const values = widthRows.map(function(row){ return row[columnIndex]; });
+    const values = rows.map(function(row){ return row[columnIndex]; });
     if(label === '日期') return excelColumnWidth(label, values, 96, 160);
     if(label === '收入' || label === '支出') return excelColumnWidth(label, values, 72, 92);
     if(label === '结余') return excelColumnWidth(label, values, 96, 170);
@@ -4679,27 +4646,19 @@ function exportCSV(){
     return excelColumnWidth(label, values, 105, 700);
   });
   const st = calcStats();
-  const normalIncome = Math.round(sorted.reduce(function(sum, r){
-    return sum + (r.type === 'income' ? r.amount : 0);
-  }, 0) * 100) / 100;
-  const normalExpense = Math.round(sorted.reduce(function(sum, r){
-    return sum + (r.type === 'expense' ? r.amount : 0);
-  }, 0) * 100) / 100;
-  const normalBalance = Math.round((st.openingBalance + normalIncome - normalExpense) * 100) / 100;
+  const incomeIndex = hasDonor ? 3 : 2;
+  const expenseIndex = incomeIndex + 1;
+  const balanceIndex = incomeIndex + 2;
+  const noteIndex = columns.length - 1;
   const openingRow = new Array(columns.length).fill('');
   openingRow[0] = '上月结余';
   openingRow[balanceIndex] = st.openingBalance.toFixed(2);
   openingRow[noteIndex] = getOpeningBalanceNote();
   const closingRow = new Array(columns.length).fill('');
   closingRow[0] = '本月结余';
-  closingRow[incomeIndex] = normalIncome.toFixed(2);
-  closingRow[expenseIndex] = (-normalExpense).toFixed(2);
-  closingRow[balanceIndex] = normalBalance.toFixed(2);
-  const materialHeaderRow = new Array(columns.length).fill('');
-  materialHeaderRow[0] = '日期';
-  materialHeaderRow[1] = '备注';
-  if(hasDonor) materialHeaderRow[2] = '捐赠人';
-  materialHeaderRow[incomeIndex] = '类别';
+  closingRow[incomeIndex] = st.monthIncome.toFixed(2);
+  closingRow[expenseIndex] = (-st.monthExpense).toFixed(2);
+  closingRow[balanceIndex] = st.balance.toFixed(2);
   const excelColumnLetter = function(index){ return String.fromCharCode(65 + index); };
   const incomeLetter = excelColumnLetter(incomeIndex);
   const expenseLetter = excelColumnLetter(expenseIndex);
@@ -4718,16 +4677,15 @@ function exportCSV(){
   const closingExcelRow = firstDataExcelRow + sorted.length;
   const balanceFormula = '=ROUND(' + balanceLetter + '3+' +
     incomeLetter + closingExcelRow + '+' + expenseLetter + closingExcelRow + ',2)';
-  const renderRow = function(row, formulas, orangeTotal, blueIndex){
+  const renderRow = function(row, formulas, orangeTotal){
     return '<tr>' + row.map(function(value, index){
       const formula = formulas && formulas[index];
       const attrs = [];
-      if(value !== '' && /^-?\d+(?:\.\d+)?$/.test(String(value)) &&
-        (index === incomeIndex || index === expenseIndex || index === balanceIndex)){
+      if(value !== '' && (index === incomeIndex || index === expenseIndex || index === balanceIndex)){
         attrs.push('x:num="' + escapeHtml(value) + '"');
       }
       if(formula) attrs.push('x:fmla="' + escapeHtml(formula) + '"');
-      if(index === blueIndex){
+      if(row[1] === '捐赠' && index === 1){
         attrs.push('style="background:#BDD7EE;"');
       }
       if(orangeTotal && (index === incomeIndex || index === expenseIndex || index === balanceIndex)){
@@ -4768,12 +4726,6 @@ function exportCSV(){
       formulas[balanceIndex] = balanceFormula;
       return formulas;
     })(), true),
-    materialRows.length ? renderRow(new Array(columns.length).fill('')) : '',
-    materialRows.length ? renderRow(new Array(columns.length).fill('')) : '',
-    materialRows.length ? renderRow(materialHeaderRow) : '',
-    materialRows.map(function(row){
-      return renderRow(row, null, false, incomeIndex);
-    }).join(''),
     '</table>',
     '</body>',
     '</html>'
