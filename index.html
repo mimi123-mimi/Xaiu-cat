@@ -221,9 +221,13 @@ button{font-family:inherit;}
   display:flex;
   align-items:center;
   gap:8px;
+  flex-wrap:wrap;
+  justify-content:flex-end;
 }
 .budget-input-group label{font-size:13px;color:var(--muted);white-space:nowrap;}
+.budget-field{display:flex;align-items:center;gap:8px;}
 #budgetInput{width:140px;text-align:right;}
+#openingBalanceNoteInput{width:220px;}
 .budget-stats{
   display:flex;
   gap:18px;
@@ -1016,8 +1020,14 @@ footer{
         <p class="card-sub" style="margin:6px 0 0;">请填写上个月结转至本月的剩余资金。当前结余会自动按“上月结余 + 总收入 - 总支出”计算。</p>
       </div>
       <div class="budget-input-group">
-        <label for="budgetInput">上月剩余资金（元）</label>
-        <input type="number" id="budgetInput" min="0" step="0.01" value="" placeholder="如：405.00" readonly>
+        <div class="budget-field">
+          <label for="budgetInput">上月剩余资金（元）</label>
+          <input type="number" id="budgetInput" min="0" step="0.01" value="" placeholder="如：405.00" readonly>
+        </div>
+        <div class="budget-field">
+          <label for="openingBalanceNoteInput">结余备注（选填）</label>
+          <input type="text" id="openingBalanceNoteInput" maxlength="100" placeholder="如：9月结转" readonly>
+        </div>
         <button type="button" class="btn primary small admin-only hidden" id="budgetSaveBtn">保存</button>
       </div>
     </div>
@@ -1080,7 +1090,7 @@ footer{
             <option value="绝育">绝育</option>
             <option value="医疗">医疗</option>
             <option value="义卖">义卖</option>
-            <option value="捐款">捐款</option>
+            <option value="爱心资助">爱心资助</option>
             <option value="捐赠">捐赠</option>
             <option value="物资采购">物资采购</option>
             <option value="其他">其他</option>
@@ -1088,7 +1098,7 @@ footer{
         </div>
         <div class="field">
           <label for="donorInput">捐款人/捐赠人</label>
-          <input type="text" id="donorInput" maxlength="40" placeholder="捐款/捐赠可选填；类别“捐款”必填">
+          <input type="text" id="donorInput" maxlength="40" placeholder="捐款/捐赠可选填；类别“爱心资助”必填">
         </div>
         <div class="field">
           <label for="amountInput">金额（元，捐赠物资可不填）</label>
@@ -1812,6 +1822,7 @@ function closeImgLightbox(){
 const STORAGE_KEY = 'catLedgerRecords';
 const PASS_KEY = 'adminPassword';
 const BUDGET_KEY = 'monthlyBudget';
+const OPENING_BALANCE_NOTE_KEY = 'openingBalanceNote';
 const CATS_KEY = 'catProfiles';
 const ADMINS_KEY = 'adminAccounts';
 const ADMIN_SESSION_KEY = 'catAdminSession';
@@ -1834,7 +1845,7 @@ const CLOUD_OPENING_BALANCE_DIRTY_KEY = 'catCloudOpeningBalanceDirtyV1';
 const INV_MUTATION_KEY = 'catInventoryMutationV1';
 const CLOUD_CFG_ID = 'main';
 const DEFAULT_PASSWORD = 'cat2026';
-const CATEGORIES = ['猫粮','罐头','绝育','医疗','义卖','捐款','捐赠','成员群收款','新成员入群','物资采购','其他'];
+const CATEGORIES = ['猫粮','罐头','绝育','医疗','义卖','捐款','爱心资助','捐赠','成员群收款','新成员入群','物资采购','其他'];
 
 const $ = (id) => document.getElementById(id);
 let records = loadRecords();
@@ -1949,6 +1960,9 @@ function loadCloudConfigCache(){
     return {
       admins: Array.isArray(obj.admins) ? obj.admins : [],
       budget: Object.prototype.hasOwnProperty.call(obj, 'budget') ? obj.budget : null,
+      openingBalanceNote: Object.prototype.hasOwnProperty.call(obj, 'openingBalanceNote')
+        ? String(obj.openingBalanceNote || '')
+        : '',
       publicInv: Array.isArray(obj.publicInv) ? obj.publicInv : null,
       publicInvLogs: Array.isArray(obj.publicInvLogs) ? obj.publicInvLogs : null,
       fosterInv: Array.isArray(obj.fosterInv) ? obj.fosterInv : null,
@@ -2157,6 +2171,15 @@ function getOpeningBalance(){
   const val = parseFloat(readLS(BUDGET_KEY));
   return (isFinite(val) && val >= 0) ? val : null;
 }
+function getOpeningBalanceNote(){
+  if(cloudOpeningBalanceDirty){
+    return String(readLS(OPENING_BALANCE_NOTE_KEY) || '');
+  }
+  if(cloudConfigCache && Object.prototype.hasOwnProperty.call(cloudConfigCache, 'openingBalanceNote')){
+    return String(cloudConfigCache.openingBalanceNote || '');
+  }
+  return String(readLS(OPENING_BALANCE_NOTE_KEY) || '');
+}
 function setOpeningBalanceValue(text){
   const rawText = text === null || text === undefined ? '' : String(text);
   writeLS(BUDGET_KEY, rawText);
@@ -2165,6 +2188,18 @@ function setOpeningBalanceValue(text){
   if(!cloudConfigCache) cloudConfigCache = loadCloudConfigCache() || {};
   if(!Array.isArray(cloudConfigCache.admins)) cloudConfigCache.admins = getAdminAccounts();
   cloudConfigCache.budget = normalized;
+  cloudConfigCache.updatedAt = new Date().toISOString();
+  saveCloudConfigCache(cloudConfigCache);
+  markCloudOpeningBalanceDirty();
+  markCloudConfigDirty();
+  scheduleCloudSync(600);
+}
+function setOpeningBalanceNote(text){
+  const normalized = String(text === null || text === undefined ? '' : text).trim().slice(0, 100);
+  writeLS(OPENING_BALANCE_NOTE_KEY, normalized);
+  if(!cloudConfigCache) cloudConfigCache = loadCloudConfigCache() || {};
+  if(!Array.isArray(cloudConfigCache.admins)) cloudConfigCache.admins = getAdminAccounts();
+  cloudConfigCache.openingBalanceNote = normalized;
   cloudConfigCache.updatedAt = new Date().toISOString();
   saveCloudConfigCache(cloudConfigCache);
   markCloudOpeningBalanceDirty();
@@ -2249,10 +2284,12 @@ function normalizeRecord(raw){
   const type = (raw.type === 'income') ? 'income' : 'expense';
   const amount = Math.abs(parseFloat(raw.amount)) || 0;
   if(!isFinite(amount) || amount < 0) return null;
-  if(amount === 0 && ['捐赠','捐款'].indexOf(raw.category) < 0) return null;
+  if(amount === 0 && ['捐赠','爱心资助','捐款'].indexOf(raw.category) < 0) return null;
   const date = String(raw.date || '');
   if(!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
-  const category = CATEGORIES.indexOf(raw.category) >= 0 ? raw.category : '其他';
+  const category = raw.category === '捐款'
+    ? '爱心资助'
+    : (CATEGORIES.indexOf(raw.category) >= 0 ? raw.category : '其他');
   return {
     id: String(raw.id || raw._id || genId()),
     type: type,
@@ -3173,14 +3210,16 @@ async function flushCloud(){
       await cloudDocSet('config', CLOUD_CFG_ID, cfg);
       const latest = buildCloudConfigObject();
       const openingBalanceUnchangedDuringUpload =
-        JSON.stringify(cfg.budget) === JSON.stringify(latest.budget);
-      const syncedKeys = ['admins','budget','recordsBackup','recordTombstones','catTombstones','publicInv','publicInvLogs','fosterInv','fosterInvLogs','publicInvBackup','publicInvLogsBackup','fosterInvBackup','fosterInvLogsBackup','invMutationAt'];
+        JSON.stringify(cfg.budget) === JSON.stringify(latest.budget) &&
+        JSON.stringify(cfg.openingBalanceNote) === JSON.stringify(latest.openingBalanceNote);
+      const syncedKeys = ['admins','budget','openingBalanceNote','recordsBackup','recordTombstones','catTombstones','publicInv','publicInvLogs','fosterInv','fosterInvLogs','publicInvBackup','publicInvLogsBackup','fosterInvBackup','fosterInvLogsBackup','invMutationAt'];
       const unchangedDuringUpload = syncedKeys.every(function(key){
         return JSON.stringify(cfg[key]) === JSON.stringify(latest[key]);
       });
       cloudConfigCache = {
         admins: cfg.admins,
         budget: cfg.budget,
+        openingBalanceNote: cfg.openingBalanceNote,
         publicInv: cfg.publicInv,
         publicInvLogs: cfg.publicInvLogs,
         fosterInv: cfg.fosterInv,
@@ -3273,7 +3312,7 @@ function mergePendingCloudConfig(remoteCfg, conflict){
       : String(local.invMutationAt || ''),
     updatedAt: local.updatedAt
   };
-  ['admins','budget'].forEach(function(key){
+  ['admins','budget','openingBalanceNote'].forEach(function(key){
     const hasBase = Object.prototype.hasOwnProperty.call(base, key) &&
       base[key] !== null && base[key] !== undefined;
     const hasRemote = Object.prototype.hasOwnProperty.call(remoteCfg, key);
@@ -3360,6 +3399,7 @@ function cloudAdoptConfig(cfg, firstSeed, snapshotEpoch){
   const rawBudget = Object.prototype.hasOwnProperty.call(effective, 'budget') ? effective.budget : null;
   const budgetNum = rawBudget === null || rawBudget === '' ? null : Number(rawBudget);
   const budget = (isFinite(budgetNum) && budgetNum >= 0) ? Math.round(budgetNum * 100) / 100 : null;
+  const openingBalanceNote = String(effective.openingBalanceNote || '').trim().slice(0, 100);
   const updatedAt = String(effective.updatedAt || new Date().toISOString());
   // 库存与流水总是载入（保底，避免某些设备/手机上不显示明细）
   const publicInvSource = Array.isArray(effective.publicInv) && effective.publicInv.length
@@ -3386,6 +3426,7 @@ function cloudAdoptConfig(cfg, firstSeed, snapshotEpoch){
     cloudConfigCache.updatedAt === updatedAt &&
     JSON.stringify(cloudConfigCache.admins) === JSON.stringify(admins) &&
     Number(cloudConfigCache.budget) === Number(budget) &&
+    String(cloudConfigCache.openingBalanceNote || '') === openingBalanceNote &&
     String(cloudConfigCache.invMutationAt || '') === String(effective.invMutationAt || '') &&
     JSON.stringify(cloudConfigCache.publicInv || []) === JSON.stringify(effective.publicInv || []) &&
     JSON.stringify(cloudConfigCache.publicInvLogs || []) === JSON.stringify(effective.publicInvLogs || []) &&
@@ -3400,6 +3441,7 @@ function cloudAdoptConfig(cfg, firstSeed, snapshotEpoch){
   cloudConfigCache = {
     admins: admins,
     budget: budget,
+    openingBalanceNote: openingBalanceNote,
     publicInv: publicInv,
     publicInvLogs: publicInvLogs,
     fosterInv: fosterInv,
@@ -3416,6 +3458,7 @@ function cloudAdoptConfig(cfg, firstSeed, snapshotEpoch){
   saveCloudConfigCache(cloudConfigCache);
   writeLS(ADMINS_KEY, JSON.stringify(admins));
   writeLS(BUDGET_KEY, budget === null ? '' : String(budget));
+  writeLS(OPENING_BALANCE_NOTE_KEY, openingBalanceNote);
   if(adminLoggedIn && oldName && !admins.some(function(a){
     return String(a.name).toLowerCase() === String(oldName).toLowerCase();
   })){
@@ -3427,6 +3470,8 @@ function cloudAdoptConfig(cfg, firstSeed, snapshotEpoch){
   if(!firstSeed){
     const budgetInput = $('budgetInput');
     if(budgetInput) budgetInput.value = budget === null ? '' : budget;
+    const openingBalanceNoteInput = $('openingBalanceNoteInput');
+    if(openingBalanceNoteInput) openingBalanceNoteInput.value = openingBalanceNote;
     renderAll(false);
   }
   renderInventory();
@@ -4081,6 +4126,7 @@ function addDonationRecord(itemName, donor, note, pool, logId){
 function buildCloudConfigObject(){
   return {
     budget: getOpeningBalance(),
+    openingBalanceNote: getOpeningBalanceNote(),
     admins: getAdminAccounts().map(function(a){
       return {name: String(a.name || ''), password: String(a.password || ''), createdAt: String(a.createdAt || '')};
     }),
@@ -4149,7 +4195,7 @@ function updateRecycleButtonCount(){
 }
 
 const EXPENSE_CATS = ['猫粮','罐头','绝育','医疗','物资采购','其他'];
-const INCOME_CATS = ['捐款','捐赠','成员群收款','新成员入群','其他'];
+const INCOME_CATS = ['爱心资助','捐赠','成员群收款','新成员入群','其他'];
 function rebuildCategoryOptions(){
   const sel = $('categorySelect');
   const type = $('typeSelect').value;
@@ -4242,17 +4288,17 @@ function addRecord(){
     err.textContent = '请选择日期';
     return;
   }
-  if(category === '捐款'){
+  if(category === '爱心资助'){
     if(type !== 'income'){
-      err.textContent = '类型为“捐款”时请选择“收入”';
+      err.textContent = '类型为“爱心资助”时请选择“收入”';
       return;
     }
     if(!donor){
-      err.textContent = '类型为“捐款”时必须填写捐款人';
+      err.textContent = '类型为“爱心资助”时必须填写捐款人';
       return;
     }
     if(!isFinite(rawAmount) || rawAmount <= 0){
-      err.textContent = '类型为“捐款”时请填写收入金额';
+      err.textContent = '类型为“爱心资助”时请填写收入金额';
       return;
     }
   }
@@ -4260,7 +4306,7 @@ function addRecord(){
     err.textContent = '金额无效';
     return;
   }
-  if(rawAmount === 0 && ['捐赠','捐款'].indexOf(category) < 0){
+  if(rawAmount === 0 && ['捐赠','爱心资助'].indexOf(category) < 0){
     err.textContent = '请输入大于 0 的金额（捐赠物资可不填金额）';
     return;
   }
@@ -4404,12 +4450,12 @@ function saveRecordEdit(){
   const note = $('editNoteInput').value.trim();
   const err = $('recordEditError');
   if(!date){ err.textContent = '请选择日期'; return; }
-  if(category === '捐款'){
-    if(type !== 'income'){ err.textContent = '类型为“捐款”时请选择“收入”'; return; }
-    if(!donor){ err.textContent = '类型为“捐款”时必须填写捐款人'; return; }
-    if(!isFinite(amount) || amount <= 0){ err.textContent = '类型为“捐款”时请填写收入金额'; return; }
+  if(category === '爱心资助'){
+    if(type !== 'income'){ err.textContent = '类型为“爱心资助”时请选择“收入”'; return; }
+    if(!donor){ err.textContent = '类型为“爱心资助”时必须填写捐款人'; return; }
+    if(!isFinite(amount) || amount <= 0){ err.textContent = '类型为“爱心资助”时请填写收入金额'; return; }
   }
-  if(amount === 0 && ['捐赠','捐款'].indexOf(category) < 0){
+  if(amount === 0 && ['捐赠','爱心资助'].indexOf(category) < 0){
     err.textContent = '金额需大于 0（捐赠物资可留空金额）';
     return;
   }
@@ -4575,16 +4621,15 @@ function exportCSV(){
   const hasDonor = sorted.some(function(r){ return String(r.donor || '').trim() !== ''; });
   const columns = ['日期','类别'];
   if(hasDonor) columns.push('捐款人/捐赠人');
-  columns.push('收入','支出','金额','结余','备注');
+  columns.push('收入','支出','结余','备注');
 
   const rows = sorted.map(function(r){
-    const signed = r.type === 'income' ? r.amount : -r.amount;
-    const row = [r.date, r.category];
+    const categoryLabel = r.category === '捐款' ? '爱心资助' : r.category;
+    const row = [r.date, categoryLabel];
     if(hasDonor) row.push(r.donor || '');
     row.push(
-      r.type === 'income' ? '收入' : '',
-      r.type === 'expense' ? '支出' : '',
-      signed.toFixed(2),
+      r.type === 'income' ? r.amount.toFixed(2) : '',
+      r.type === 'expense' ? (-r.amount).toFixed(2) : '',
       '',
       r.note || ''
     );
@@ -4595,7 +4640,7 @@ function exportCSV(){
     const values = rows.map(function(row){ return row[columnIndex]; });
     if(label === '日期') return excelColumnWidth(label, values, 96, 160);
     if(label === '收入' || label === '支出') return excelColumnWidth(label, values, 72, 92);
-    if(label === '金额' || label === '结余') return excelColumnWidth(label, values, 96, 170);
+    if(label === '结余') return excelColumnWidth(label, values, 96, 170);
     if(label === '备注') return excelColumnWidth(label, values, 150, 1800);
     if(label === '捐款人/捐赠人') return excelColumnWidth(label, values, 120, 900);
     return excelColumnWidth(label, values, 105, 700);
@@ -4603,43 +4648,56 @@ function exportCSV(){
   const st = calcStats();
   const incomeIndex = hasDonor ? 3 : 2;
   const expenseIndex = incomeIndex + 1;
-  const amountIndex = incomeIndex + 2;
-  const balanceIndex = incomeIndex + 3;
+  const balanceIndex = incomeIndex + 2;
+  const noteIndex = columns.length - 1;
   const openingRow = new Array(columns.length).fill('');
   openingRow[0] = '上月结余';
   openingRow[balanceIndex] = st.openingBalance.toFixed(2);
+  openingRow[noteIndex] = getOpeningBalanceNote();
   const closingRow = new Array(columns.length).fill('');
   closingRow[0] = '本月结余';
+  closingRow[incomeIndex] = st.monthIncome.toFixed(2);
+  closingRow[expenseIndex] = (-st.monthExpense).toFixed(2);
   closingRow[balanceIndex] = st.balance.toFixed(2);
   const excelColumnLetter = function(index){ return String.fromCharCode(65 + index); };
   const incomeLetter = excelColumnLetter(incomeIndex);
   const expenseLetter = excelColumnLetter(expenseIndex);
-  const amountLetter = excelColumnLetter(amountIndex);
   const balanceLetter = excelColumnLetter(balanceIndex);
   const firstDataExcelRow = 4;
   const lastDataExcelRow = 3 + sorted.length;
-  const balanceFormula = sorted.length
-    ? '=ROUND(' + balanceLetter + '3' +
-      '+SUMIF(' + incomeLetter + firstDataExcelRow + ':' + incomeLetter + lastDataExcelRow + ',"收入",' +
-      amountLetter + firstDataExcelRow + ':' + amountLetter + lastDataExcelRow + ')' +
-      '+SUMIF(' + expenseLetter + firstDataExcelRow + ':' + expenseLetter + lastDataExcelRow + ',"支出",' +
-      amountLetter + firstDataExcelRow + ':' + amountLetter + lastDataExcelRow + '),2)'
-    : '=ROUND(' + balanceLetter + '3,2)';
-  const renderRow = function(row, formula){
+  const dataRange = function(letter){
+    return sorted.length ? letter + firstDataExcelRow + ':' + letter + lastDataExcelRow : '';
+  };
+  const incomeFormula = sorted.length
+    ? '=ROUND(SUM(' + dataRange(incomeLetter) + '),2)'
+    : '=0';
+  const expenseFormula = sorted.length
+    ? '=ROUND(SUM(' + dataRange(expenseLetter) + '),2)'
+    : '=0';
+  const closingExcelRow = firstDataExcelRow + sorted.length;
+  const balanceFormula = '=ROUND(' + balanceLetter + '3+' +
+    incomeLetter + closingExcelRow + '+' + expenseLetter + closingExcelRow + ',2)';
+  const renderRow = function(row, formulas, orangeTotal){
     return '<tr>' + row.map(function(value, index){
-      if(formula && index === balanceIndex){
-        return '<td x:num="' + escapeHtml(value) + '" x:fmla="' + escapeHtml(formula) + '">' + escapeHtml(value) + '</td>';
+      const formula = formulas && formulas[index];
+      const attrs = [];
+      if(value !== '' && (index === incomeIndex || index === expenseIndex || index === balanceIndex)){
+        attrs.push('x:num="' + escapeHtml(value) + '"');
       }
-      if(value !== '' && (index === amountIndex || index === balanceIndex)){
-        return '<td x:num="' + escapeHtml(value) + '">' + escapeHtml(value) + '</td>';
+      if(formula) attrs.push('x:fmla="' + escapeHtml(formula) + '"');
+      if(row[1] === '捐赠' && index === 1){
+        attrs.push('style="background:#BDD7EE;"');
       }
-      return '<td>' + escapeHtml(value) + '</td>';
+      if(orangeTotal && (index === incomeIndex || index === expenseIndex || index === balanceIndex)){
+        attrs.push('style="background:#F8CBAD;"');
+      }
+      return '<td' + (attrs.length ? ' ' + attrs.join(' ') : '') + '>' + escapeHtml(value) + '</td>';
     }).join('') + '</tr>';
   };
   const headerRow1 = ['<td rowspan="2">日期</td>','<td rowspan="2">类别</td>'];
   if(hasDonor) headerRow1.push('<td rowspan="2">捐款人/捐赠人</td>');
   headerRow1.push('<td colspan="2">类型</td>');
-  headerRow1.push('<td rowspan="2">金额</td>','<td rowspan="2">结余</td>','<td rowspan="2">备注</td>');
+  headerRow1.push('<td rowspan="2">结余</td>','<td rowspan="2">备注</td>');
   const headerRow2 = ['<td>收入</td>','<td>支出</td>'];
   const table = [
     '<!DOCTYPE html>',
@@ -4661,7 +4719,13 @@ function exportCSV(){
     '<tr>' + headerRow2.join('') + '</tr>',
     renderRow(openingRow),
     rows.map(function(row){ return renderRow(row); }).join(''),
-    renderRow(closingRow, balanceFormula),
+    renderRow(closingRow, (function(){
+      const formulas = {};
+      formulas[incomeIndex] = incomeFormula;
+      formulas[expenseIndex] = expenseFormula;
+      formulas[balanceIndex] = balanceFormula;
+      return formulas;
+    })(), true),
     '</table>',
     '</body>',
     '</html>'
@@ -4786,6 +4850,7 @@ function setAdminUI(on){
   $('adminSwitch').checked = on;
   $('adminModeText').textContent = on ? '管理员模式（已开启）' : '管理员模式';
   $('budgetInput').readOnly = !on;
+  $('openingBalanceNoteInput').readOnly = !on;
   if(on){
     $('entrySection').classList.remove('hidden');
   }else{
@@ -5036,8 +5101,10 @@ function bindEvents(){
 
   $('budgetSaveBtn').addEventListener('click', function(){
     const rawValue = $('budgetInput').value.trim();
+    const openingNote = $('openingBalanceNoteInput').value.trim();
     if(rawValue === ''){
       setOpeningBalanceValue('');
+      setOpeningBalanceNote(openingNote);
       renderAll(false);
       showToast('已清除上月结余，当前按 ¥0.00 计算');
       return;
@@ -5048,10 +5115,14 @@ function bindEvents(){
       return;
     }
     setOpeningBalanceValue(String(Math.round(val*100)/100));
+    setOpeningBalanceNote(openingNote);
     renderAll();
     showToast('上月结余已更新为 ' + formatMoney(val));
   });
   $('budgetInput').addEventListener('keydown', function(e){
+    if(e.key === 'Enter'){ e.preventDefault(); $('budgetSaveBtn').click(); }
+  });
+  $('openingBalanceNoteInput').addEventListener('keydown', function(e){
     if(e.key === 'Enter'){ e.preventDefault(); $('budgetSaveBtn').click(); }
   });
 
@@ -5302,6 +5373,7 @@ function init(){
   $('recordDate').value = todayStr();
   const openingBalance = getOpeningBalance();
   $('budgetInput').value = openingBalance === null ? '' : openingBalance;
+  $('openingBalanceNoteInput').value = getOpeningBalanceNote();
   bindEvents();
   const sessionName = readSS(ADMIN_SESSION_KEY);
   let sessionOn = false;
