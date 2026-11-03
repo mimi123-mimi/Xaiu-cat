@@ -3817,6 +3817,18 @@ function normalizeInvLog(raw){
 }
 function invItems(pool){ return pool === 'foster' ? fosterInv : publicInv; }
 function invLogs(pool){ return pool === 'foster' ? fosterInvLogs : publicInvLogs; }
+function findInvItemForLog(pool, log){
+  if(!log) return null;
+  const items = invItems(pool);
+  let item = log.itemId ? items.find(function(x){ return x.id === log.itemId; }) : null;
+  if(!item){
+    const logName = String(log.itemName || '').trim();
+    if(logName){
+      item = items.find(function(x){ return String(x.name || '').trim() === logName; }) || null;
+    }
+  }
+  return item;
+}
 function invStateKeys(pool){
   return pool === 'foster'
     ? {itemsKey: FOS_INV_KEY, logsKey: FOS_INVLOG_KEY}
@@ -4075,35 +4087,41 @@ function saveInvLogEdit(){
 function delInvLog(pool, logId){
   const log = invLogs(pool).find(function(l){ return l.id === logId; });
   if(!log) return;
-  const it = invItems(pool).find(function(x){ return x.id === log.itemId; });
   const linked = log.recLink ? findRecord(log.recLink) : null;
   const warn = linked
     ? '<br><br><span style="color:#B72E33;font-weight:600;background:#FFE3E0;padding:3px 8px;border-radius:6px;">⚠️ 关联的记账明细也会被同步删除</span>'
     : '';
   askConfirm('删除这条流水？',
     '删除后会撤销这条流水对库存的影响：入库的会扣回库存，出库的会退回库存。' + warn, function(){
+    // 确认期间可能刚好完成一次云端同步；必须在执行时重新查找当前物资，
+    // 不能使用点击删除按钮时的旧对象，否则库存卡片不会变化。
+    const logs = invLogs(pool);
+    const currentLog = logs.find(function(l){ return l.id === logId; });
+    if(!currentLog) return;
+    const it = findInvItemForLog(pool, currentLog);
     if(it){
-      if(log.type === 'out'){
-        it.quantity = roundQty(it.quantity + log.qty);
+      if(currentLog.type === 'out'){
+        it.quantity = roundQty(it.quantity + currentLog.qty);
       }else{
-        it.quantity = Math.max(0, roundQty(it.quantity - log.qty));
-        it.totalIn = Math.max(0, roundQty(it.totalIn - log.qty));
+        it.quantity = Math.max(0, roundQty(it.quantity - currentLog.qty));
+        it.totalIn = Math.max(0, roundQty(it.totalIn - currentLog.qty));
       }
       it.updatedAt = new Date().toISOString();
+      if(currentLog.itemId !== it.id) currentLog.itemId = it.id;
     }
-    const logs = invLogs(pool);
     const idx = logs.findIndex(function(l){ return l.id === logId; });
     if(idx >= 0) logs.splice(idx, 1);
     saveInvState(pool);
-    if(linked){
-      cloudNoteHardRemove('records', linked.record.id);
-      const ridx = records.findIndex(function(r){ return r.id === linked.record.id; });
+    const currentLinked = currentLog.recLink ? findRecord(currentLog.recLink) : null;
+    if(currentLinked){
+      cloudNoteHardRemove('records', currentLinked.record.id);
+      const ridx = records.findIndex(function(r){ return r.id === currentLinked.record.id; });
       if(ridx >= 0) records.splice(ridx, 1);
       saveRecords();
     }
     renderAll(false);
     renderRecycleList();
-    showToast(linked ? '已删除流水，关联记账已同步删除' : '已删除该条流水，库存已同步');
+    showToast(currentLinked ? '已删除流水，关联记账已同步删除' : '已删除该条流水，库存已同步');
   });
 }
 function addPurchasedExpense(itemName, amount, note, pool, logId){
@@ -4485,11 +4503,12 @@ function removeLinkedInventoryLog(link){
   const logs = invLogs(pool);
   const log = logs.find(function(l){ return l.id === link.logId; });
   if(!log) return;
-  const item = invItems(pool).find(function(x){ return x.id === log.itemId; });
+  const item = findInvItemForLog(pool, log);
   if(item){
     if(log.type === 'out') item.quantity += log.qty;
     else { item.quantity = Math.max(0, item.quantity - log.qty); item.totalIn = Math.max(0, item.totalIn - log.qty); }
     item.updatedAt = new Date().toISOString();
+    if(log.itemId !== item.id) log.itemId = item.id;
   }
   const idx = logs.findIndex(function(l){ return l.id === log.id; });
   if(idx >= 0) logs.splice(idx, 1);

@@ -1,5 +1,5 @@
 /* Xaiu猫猫守护团 · Service Worker：本地加速（缓存页面与依赖，重复打开秒开，离线可用） */
-const CACHE = 'xaiu-cat-v18-material-donation';
+const CACHE = 'xaiu-cat-v19-inventory-log-sync';
 self.addEventListener('install', function(e){
   self.skipWaiting();
 });
