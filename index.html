@@ -1830,6 +1830,7 @@ const CLOUD_URL_KEY = 'catCloudUrlCacheV1';
 const CLOUD_TOMB_KEY = 'catCloudTombstonesV1';
 const CLOUD_SEEN_KEY = 'catCloudSeenV1';
 const CLOUD_CONFIG_DIRTY_KEY = 'catCloudConfigDirtyV1';
+const CLOUD_OPENING_BALANCE_DIRTY_KEY = 'catCloudOpeningBalanceDirtyV1';
 const INV_MUTATION_KEY = 'catInventoryMutationV1';
 const CLOUD_CFG_ID = 'main';
 const DEFAULT_PASSWORD = 'cat2026';
@@ -1855,6 +1856,7 @@ let cloudSeen = loadCloudSeen();
 let cloudDirtyRecords = new Set();
 let cloudDirtyCats = new Set();
 let cloudConfigDirty = readLS(CLOUD_CONFIG_DIRTY_KEY) === '1';
+let cloudOpeningBalanceDirty = readLS(CLOUD_OPENING_BALANCE_DIRTY_KEY) === '1';
 let cloudInvMutationAt = String(readLS(INV_MUTATION_KEY) || '');
 let cloudMutationEpoch = 0;
 let cloudFlushTimer = null;
@@ -1890,6 +1892,16 @@ function todayStr(){
 function currentMonthKey(){
   const d = new Date();
   return d.getFullYear() + '-' + pad2(d.getMonth()+1);
+}
+function reportMonthKey(){
+  const current = currentMonthKey();
+  const monthKeys = records
+    .filter(function(r){ return !r.deleted && /^\d{4}-\d{2}-\d{2}$/.test(String(r.date || '')); })
+    .map(function(r){ return monthKeyOf(r.date); })
+    .filter(function(key){ return /^\d{4}-\d{2}$/.test(key); })
+    .sort();
+  if(!monthKeys.length || monthKeys.indexOf(current) >= 0) return current;
+  return monthKeys[monthKeys.length - 1];
 }
 function monthKeyOf(dateStr){
   return String(dateStr || '').slice(0,7);
@@ -1965,6 +1977,14 @@ function markCloudConfigDirty(){
 function clearCloudConfigDirty(){
   cloudConfigDirty = false;
   try{ localStorage.removeItem(CLOUD_CONFIG_DIRTY_KEY); }catch(e){}
+}
+function markCloudOpeningBalanceDirty(){
+  cloudOpeningBalanceDirty = true;
+  try{ localStorage.setItem(CLOUD_OPENING_BALANCE_DIRTY_KEY, '1'); }catch(e){}
+}
+function clearCloudOpeningBalanceDirty(){
+  cloudOpeningBalanceDirty = false;
+  try{ localStorage.removeItem(CLOUD_OPENING_BALANCE_DIRTY_KEY); }catch(e){}
 }
 function markInventoryMutation(){
   cloudInvMutationAt = new Date().toISOString();
@@ -2122,6 +2142,12 @@ function removeAdminAccount(name){
   saveAdminAccounts(next);
 }
 function getOpeningBalance(){
+  if(cloudOpeningBalanceDirty){
+    const pendingRaw = readLS(BUDGET_KEY);
+    if(pendingRaw === null || pendingRaw === '') return null;
+    const pending = parseFloat(pendingRaw);
+    return (isFinite(pending) && pending >= 0) ? pending : null;
+  }
   if(cloudConfigCache && Object.prototype.hasOwnProperty.call(cloudConfigCache, 'budget')){
     const cached = Number(cloudConfigCache.budget);
     return (cloudConfigCache.budget !== null && cloudConfigCache.budget !== '' && isFinite(cached) && cached >= 0) ? cached : null;
@@ -2134,14 +2160,16 @@ function getOpeningBalance(){
 function setOpeningBalanceValue(text){
   const rawText = text === null || text === undefined ? '' : String(text);
   writeLS(BUDGET_KEY, rawText);
-  if(cloudConfigCache){
-    const num = parseFloat(rawText);
-    cloudConfigCache.budget = (rawText !== '' && isFinite(num) && num >= 0) ? Math.round(num * 100) / 100 : null;
-    cloudConfigCache.updatedAt = new Date().toISOString();
-    saveCloudConfigCache(cloudConfigCache);
-    markCloudConfigDirty();
-    scheduleCloudSync(600);
-  }
+  const num = parseFloat(rawText);
+  const normalized = (rawText !== '' && isFinite(num) && num >= 0) ? Math.round(num * 100) / 100 : null;
+  if(!cloudConfigCache) cloudConfigCache = loadCloudConfigCache() || {};
+  if(!Array.isArray(cloudConfigCache.admins)) cloudConfigCache.admins = getAdminAccounts();
+  cloudConfigCache.budget = normalized;
+  cloudConfigCache.updatedAt = new Date().toISOString();
+  saveCloudConfigCache(cloudConfigCache);
+  markCloudOpeningBalanceDirty();
+  markCloudConfigDirty();
+  scheduleCloudSync(600);
 }
 function normalizeCat(raw){
   if(!raw || typeof raw !== 'object') return null;
@@ -2285,7 +2313,7 @@ function calcStats(){
   let totalExpense = 0;
   let monthIncome = 0;
   let monthExpense = 0;
-  const mKey = currentMonthKey();
+  const mKey = reportMonthKey();
   for(const r of records){
     if(r.deleted) continue;
     if(r.type === 'income'){
@@ -2302,8 +2330,9 @@ function calcStats(){
     totalExpense: Math.round(totalExpense*100)/100,
     monthIncome: Math.round(monthIncome*100)/100,
     openingBalance: Math.round(openingBalance*100)/100,
-    balance: Math.round((openingBalance + totalIncome - totalExpense)*100)/100,
-    monthExpense: Math.round(monthExpense*100)/100
+    balance: Math.round((openingBalance + monthIncome - monthExpense)*100)/100,
+    monthExpense: Math.round(monthExpense*100)/100,
+    reportMonthKey: mKey
   };
 }
 
@@ -2320,7 +2349,8 @@ function renderStats(){
 function renderOpeningBalance(){
   const st = calcStats();
   const saved = getOpeningBalance();
-  $('budgetInput').value = saved === null ? '' : saved;
+  const budgetInput = $('budgetInput');
+  if(document.activeElement !== budgetInput) budgetInput.value = saved === null ? '' : saved;
   $('openingBalanceValue').textContent = formatMoney(st.openingBalance);
   $('monthIncomeValue').textContent = formatMoney(st.monthIncome);
   $('monthExpenseValue').textContent = formatMoney(st.monthExpense);
@@ -2328,7 +2358,7 @@ function renderOpeningBalance(){
   $('currentBalanceValue').style.color = st.balance < 0 ? 'var(--red)' : '';
   $('budgetTip').textContent = saved === null
     ? '请填写上月剩余资金；未填写时暂按 ¥0.00 计算。'
-    : '当前结余 = 上月结余 ' + formatMoney(st.openingBalance) + ' + 总收入 ' + formatMoney(st.totalIncome) + ' - 总支出 ' + formatMoney(st.totalExpense) + '。';
+    : '当前结余 = 上月结余 ' + formatMoney(st.openingBalance) + ' + 本月收入 ' + formatMoney(st.monthIncome) + ' - 本月支出 ' + formatMoney(st.monthExpense) + '。';
 }
 
 function renderCatSummary(){
@@ -2661,7 +2691,9 @@ function renderForecast(){
   const dayOfMonth = now.getDate();
   const remaining = Math.max(totalDays - dayOfMonth, 0);
 
-  let rows = '<div class="forecast-row"><span>上月结余</span><b>' + (openingBalance === null ? '未填写' : formatMoney(st.openingBalance)) + '</b></div>';
+  const reportMonthLabel = st.reportMonthKey.replace('-', ' 年 ') + ' 月';
+  let rows = '<div class="forecast-row"><span>统计账期</span><b>' + escapeHtml(reportMonthLabel) + '</b></div>';
+  rows += '<div class="forecast-row"><span>上月结余</span><b>' + (openingBalance === null ? '未填写' : formatMoney(st.openingBalance)) + '</b></div>';
   rows += '<div class="forecast-row"><span>本月收入</span><b>' + formatMoney(st.monthIncome) + '</b></div>';
   rows += '<div class="forecast-row"><span>本月支出</span><b>' + formatMoney(st.monthExpense) + '</b></div>';
   rows += '<div class="forecast-row"><span>当前结余</span><b style="color:' + (st.balance < 0 ? '#B72E33' : 'inherit') + ';">' + formatMoney(st.balance) + '</b></div>';
@@ -2673,11 +2705,13 @@ function renderForecast(){
 }
 
 /* ---------- 图表 ---------- */
-function lastMonths(n){
+function lastMonths(n, anchorMonthKey){
   const arr = [];
-  const now = new Date();
+  const anchor = /^\d{4}-\d{2}$/.test(String(anchorMonthKey || ''))
+    ? new Date(Number(anchorMonthKey.slice(0,4)), Number(anchorMonthKey.slice(5,7)) - 1, 1)
+    : new Date();
   for(let i = n - 1; i >= 0; i--){
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const d = new Date(anchor.getFullYear(), anchor.getMonth() - i, 1);
     arr.push(d.getFullYear() + '-' + pad2(d.getMonth() + 1));
   }
   return arr;
@@ -2698,7 +2732,7 @@ function renderCharts(){
   /* 饼图：本月支出分类 */
   if(pieChart){ pieChart.destroy(); pieChart = null; }
   const sums = {};
-  const mKey = currentMonthKey();
+  const mKey = reportMonthKey();
   for(const r of records){
     if(r.deleted || r.type !== 'expense') continue;
     if(monthKeyOf(r.date) === mKey){
@@ -2739,7 +2773,7 @@ function renderCharts(){
 
   /* 折线图：过去 12 个月 */
   if(lineChart){ lineChart.destroy(); lineChart = null; }
-  const months = lastMonths(12);
+  const months = lastMonths(12, reportMonthKey());
   const monthTotals = {};
   for(const r of records){
     if(r.deleted || r.type !== 'expense') continue;
@@ -3138,6 +3172,8 @@ async function flushCloud(){
       const cfg = buildCloudConfigObject();
       await cloudDocSet('config', CLOUD_CFG_ID, cfg);
       const latest = buildCloudConfigObject();
+      const openingBalanceUnchangedDuringUpload =
+        JSON.stringify(cfg.budget) === JSON.stringify(latest.budget);
       const syncedKeys = ['admins','budget','recordsBackup','recordTombstones','catTombstones','publicInv','publicInvLogs','fosterInv','fosterInvLogs','publicInvBackup','publicInvLogsBackup','fosterInvBackup','fosterInvLogsBackup','invMutationAt'];
       const unchangedDuringUpload = syncedKeys.every(function(key){
         return JSON.stringify(cfg[key]) === JSON.stringify(latest[key]);
@@ -3159,6 +3195,7 @@ async function flushCloud(){
         lastConnectedAt: new Date().toISOString()
       };
       saveCloudConfigCache(cloudConfigCache);
+      if(openingBalanceUnchangedDuringUpload) clearCloudOpeningBalanceDirty();
       if(unchangedDuringUpload){
         clearCloudConfigDirty();
       }else{
@@ -3252,6 +3289,9 @@ function mergePendingCloudConfig(remoteCfg, conflict){
     }
     merged[key] = localChanged || !hasRemote ? localValue : remoteCfg[key];
   });
+  if(cloudOpeningBalanceDirty || conflict.forceLocal){
+    merged.budget = local.budget;
+  }
   [
     'publicInv','publicInvBackup',
     'publicInvLogs','publicInvLogsBackup',
@@ -3307,7 +3347,7 @@ function cloudAdoptConfig(cfg, firstSeed, snapshotEpoch){
       }
     });
   }
-  const preservePending = !firstSeed && (!!cloudConfigDirty || localChangedDuringRequest);
+  const preservePending = !!cloudConfigDirty || !!cloudOpeningBalanceDirty || localChangedDuringRequest;
   if(preservePending){
     // 先吸收其他设备的明确删除标记，再合并本机尚未上传的修改。
     mergeSharedTombstones('records', cfg.recordTombstones);
@@ -4526,38 +4566,45 @@ function excelColumnWidth(header, values, minWidth, maxWidth){
   return Math.max(minWidth, Math.min(maxWidth, Math.ceil(widest * 8.2 + 24)));
 }
 function exportCSV(){
-  const sorted = records.filter(function(r){ return !r.deleted; }).sort(function(a,b){
+  const reportMonth = reportMonthKey();
+  const sorted = records.filter(function(r){
+    return !r.deleted && monthKeyOf(r.date) === reportMonth;
+  }).sort(function(a,b){
     return a.date.localeCompare(b.date) || String(a.createdAt).localeCompare(String(b.createdAt));
   });
   const hasDonor = sorted.some(function(r){ return String(r.donor || '').trim() !== ''; });
   const columns = ['日期','类别'];
   if(hasDonor) columns.push('捐款人/捐赠人');
-  columns.push('类型','金额','结余','备注');
+  columns.push('收入','支出','金额','结余','备注');
 
   const rows = sorted.map(function(r){
     const signed = r.type === 'income' ? r.amount : -r.amount;
     const row = [r.date, r.category];
     if(hasDonor) row.push(r.donor || '');
-    row.push(r.type === 'income' ? '收入' : '支出', signed.toFixed(2), '', r.note || '');
+    row.push(
+      r.type === 'income' ? '收入' : '',
+      r.type === 'expense' ? '支出' : '',
+      signed.toFixed(2),
+      '',
+      r.note || ''
+    );
     return row;
   });
 
   const widths = columns.map(function(label, columnIndex){
     const values = rows.map(function(row){ return row[columnIndex]; });
     if(label === '日期') return excelColumnWidth(label, values, 96, 160);
-    if(label === '类型') return excelColumnWidth(label, values, 74, 92);
+    if(label === '收入' || label === '支出') return excelColumnWidth(label, values, 72, 92);
     if(label === '金额' || label === '结余') return excelColumnWidth(label, values, 96, 170);
     if(label === '备注') return excelColumnWidth(label, values, 150, 1800);
     if(label === '捐款人/捐赠人') return excelColumnWidth(label, values, 120, 900);
     return excelColumnWidth(label, values, 105, 700);
   });
-  const headerCells = columns.map(function(label){
-    return '<td>' + escapeHtml(label) + '</td>';
-  });
   const st = calcStats();
-  const typeIndex = hasDonor ? 3 : 2;
-  const amountIndex = hasDonor ? 4 : 3;
-  const balanceIndex = hasDonor ? 5 : 4;
+  const incomeIndex = hasDonor ? 3 : 2;
+  const expenseIndex = incomeIndex + 1;
+  const amountIndex = incomeIndex + 2;
+  const balanceIndex = incomeIndex + 3;
   const openingRow = new Array(columns.length).fill('');
   openingRow[0] = '上月结余';
   openingRow[balanceIndex] = st.openingBalance.toFixed(2);
@@ -4565,24 +4612,35 @@ function exportCSV(){
   closingRow[0] = '本月结余';
   closingRow[balanceIndex] = st.balance.toFixed(2);
   const excelColumnLetter = function(index){ return String.fromCharCode(65 + index); };
-  const typeLetter = excelColumnLetter(typeIndex);
+  const incomeLetter = excelColumnLetter(incomeIndex);
+  const expenseLetter = excelColumnLetter(expenseIndex);
   const amountLetter = excelColumnLetter(amountIndex);
   const balanceLetter = excelColumnLetter(balanceIndex);
-  const firstDataExcelRow = 3;
-  const lastDataExcelRow = 2 + sorted.length;
-  const balanceFormula = '=ROUND(' + balanceLetter + '2' +
-    '+SUMIF(' + typeLetter + firstDataExcelRow + ':' + typeLetter + lastDataExcelRow + ',"收入",' +
-    amountLetter + firstDataExcelRow + ':' + amountLetter + lastDataExcelRow + ')' +
-    '-ABS(SUMIF(' + typeLetter + firstDataExcelRow + ':' + typeLetter + lastDataExcelRow + ',"支出",' +
-    amountLetter + firstDataExcelRow + ':' + amountLetter + lastDataExcelRow + ')),2)';
+  const firstDataExcelRow = 4;
+  const lastDataExcelRow = 3 + sorted.length;
+  const balanceFormula = sorted.length
+    ? '=ROUND(' + balanceLetter + '3' +
+      '+SUMIF(' + incomeLetter + firstDataExcelRow + ':' + incomeLetter + lastDataExcelRow + ',"收入",' +
+      amountLetter + firstDataExcelRow + ':' + amountLetter + lastDataExcelRow + ')' +
+      '+SUMIF(' + expenseLetter + firstDataExcelRow + ':' + expenseLetter + lastDataExcelRow + ',"支出",' +
+      amountLetter + firstDataExcelRow + ':' + amountLetter + lastDataExcelRow + '),2)'
+    : '=ROUND(' + balanceLetter + '3,2)';
   const renderRow = function(row, formula){
     return '<tr>' + row.map(function(value, index){
       if(formula && index === balanceIndex){
-        return '<td x:fmla="' + escapeHtml(formula) + '">' + escapeHtml(value) + '</td>';
+        return '<td x:num="' + escapeHtml(value) + '" x:fmla="' + escapeHtml(formula) + '">' + escapeHtml(value) + '</td>';
+      }
+      if(value !== '' && (index === amountIndex || index === balanceIndex)){
+        return '<td x:num="' + escapeHtml(value) + '">' + escapeHtml(value) + '</td>';
       }
       return '<td>' + escapeHtml(value) + '</td>';
     }).join('') + '</tr>';
   };
+  const headerRow1 = ['<td rowspan="2">日期</td>','<td rowspan="2">类别</td>'];
+  if(hasDonor) headerRow1.push('<td rowspan="2">捐款人/捐赠人</td>');
+  headerRow1.push('<td colspan="2">类型</td>');
+  headerRow1.push('<td rowspan="2">金额</td>','<td rowspan="2">结余</td>','<td rowspan="2">备注</td>');
+  const headerRow2 = ['<td>收入</td>','<td>支出</td>'];
   const table = [
     '<!DOCTYPE html>',
     '<html xmlns:x="urn:schemas-microsoft-com:office:excel">',
@@ -4599,7 +4657,8 @@ function exportCSV(){
     '<body>',
     '<table>',
     '<colgroup>' + widths.map(function(width){ return '<col width="' + width + '" style="width:' + width + 'px">'; }).join('') + '</colgroup>',
-    '<tr>' + headerCells.join('') + '</tr>',
+    '<tr>' + headerRow1.join('') + '</tr>',
+    '<tr>' + headerRow2.join('') + '</tr>',
     renderRow(openingRow),
     rows.map(function(row){ return renderRow(row); }).join(''),
     renderRow(closingRow, balanceFormula),
@@ -4608,7 +4667,7 @@ function exportCSV(){
     '</html>'
   ].join('\r\n');
   const blob = new Blob(['\ufeff' + table], {type:'application/vnd.ms-excel;charset=utf-8;'});
-  downloadBlob(blob, 'Xaiu猫猫守护团收支明细_' + todayStr() + '.xls');
+  downloadBlob(blob, 'Xaiu猫猫守护团收支明细_' + reportMonth + '.xls');
 }
 function exportJSON(){
   const payload = {
