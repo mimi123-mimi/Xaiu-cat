@@ -4627,11 +4627,11 @@ function exportCSV(){
 
   const widths = header.map(function(label, columnIndex){
     const values = rows.map(function(row){ return row[columnIndex]; });
-    if(label === '日期') return excelColumnWidth(label, values, 96, 132);
-    if(label === '类型') return excelColumnWidth(label, values, 74, 96);
-    if(label === '金额') return excelColumnWidth(label, values, 96, 140);
-    if(label === '备注') return excelColumnWidth(label, values, 150, 420);
-    return excelColumnWidth(label, values, 105, 260);
+    if(label === '日期') return excelColumnWidth(label, values, 96, 160);
+    if(label === '类型') return excelColumnWidth(label, values, 74, 130);
+    if(label === '金额') return excelColumnWidth(label, values, 96, 170);
+    if(label === '备注') return excelColumnWidth(label, values, 150, 1800);
+    return excelColumnWidth(label, values, 105, 900);
   });
   const cellClass = function(label){
     if(label === '日期') return ' date-cell';
@@ -4649,13 +4649,12 @@ function exportCSV(){
     '</x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->',
     '<style>',
     '@page{margin:12px;}',
-    'table{border-collapse:collapse;table-layout:auto;font-family:"Microsoft YaHei","微软雅黑",Arial,sans-serif;font-size:11pt;color:#3E2A1E;}',
-    'th,td{border:1px solid #D9C7B6;padding:7px 9px;vertical-align:middle;}',
-    'th{background:#FFE1C7;color:#5C3317;font-weight:700;text-align:center;white-space:nowrap;}',
-    'tr:nth-child(even) td{background:#FFF8F1;}',
-    '.date-cell,.amount-cell{white-space:nowrap;}',
+    'table{border-collapse:collapse;table-layout:auto;font-family:"Microsoft YaHei","微软雅黑",Arial,sans-serif;font-size:11pt;color:#222222;background:#FFFFFF;}',
+    'th,td{border:1px solid #A6A6A6;padding:7px 9px;vertical-align:middle;white-space:nowrap;mso-wrap-text:no;}',
+    'th{background:#FFFFFF;color:#111111;font-weight:700;text-align:center;}',
+    'tr{height:auto;}',
+    '.date-cell{text-align:center;}',
     '.amount-cell{text-align:right;mso-number-format:"0\\.00";}',
-    '.note-cell{white-space:normal;line-height:1.45;}',
     '</style>',
     '</head>',
     '<body>',
