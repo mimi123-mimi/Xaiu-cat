@@ -4633,12 +4633,6 @@ function exportCSV(){
     if(label === '备注') return excelColumnWidth(label, values, 150, 1800);
     return excelColumnWidth(label, values, 105, 900);
   });
-  const cellClass = function(label){
-    if(label === '日期') return ' date-cell';
-    if(label === '金额') return ' amount-cell';
-    if(label === '备注') return ' note-cell';
-    return '';
-  };
   const table = [
     '<!DOCTYPE html>',
     '<html xmlns:x="urn:schemas-microsoft-com:office:excel">',
@@ -4648,26 +4642,21 @@ function exportCSV(){
     '<x:Name>收支明细</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions>',
     '</x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->',
     '<style>',
-    '@page{margin:12px;}',
-    'table{border-collapse:collapse;table-layout:auto;font-family:"Microsoft YaHei","微软雅黑",Arial,sans-serif;font-size:11pt;color:#222222;background:#FFFFFF;}',
-    'th,td{border:1px solid #A6A6A6;padding:7px 9px;vertical-align:middle;white-space:nowrap;mso-wrap-text:no;}',
-    'th{background:#FFFFFF;color:#111111;font-weight:700;text-align:center;}',
-    'tr{height:auto;}',
-    '.date-cell{text-align:center;}',
-    '.amount-cell{text-align:right;mso-number-format:"0\\.00";}',
+    'table{border-collapse:collapse;table-layout:auto;}',
+    'td{border:none;padding:0;font-weight:normal;white-space:nowrap;mso-wrap-text:no;}',
     '</style>',
     '</head>',
     '<body>',
     '<table>',
-    '<colgroup>' + widths.map(function(width){ return '<col style="width:' + width + 'px">'; }).join('') + '</colgroup>',
-    '<thead><tr>' + header.map(function(label){
-      return '<th class="' + cellClass(label).trim() + '">' + escapeHtml(label) + '</th>';
-    }).join('') + '</tr></thead>',
-    '<tbody>' + rows.map(function(row){
-      return '<tr>' + row.map(function(value, columnIndex){
-        return '<td class="' + cellClass(header[columnIndex]).trim() + '">' + escapeHtml(value) + '</td>';
+    '<colgroup>' + widths.map(function(width){ return '<col width="' + width + '" style="width:' + width + 'px">'; }).join('') + '</colgroup>',
+    '<tr>' + header.map(function(label){
+      return '<td>' + escapeHtml(label) + '</td>';
+    }).join('') + '</tr>',
+    rows.map(function(row){
+      return '<tr>' + row.map(function(value){
+        return '<td>' + escapeHtml(value) + '</td>';
       }).join('') + '</tr>';
-    }).join('') + '</tbody>',
+    }).join(''),
     '</table>',
     '</body>',
     '</html>'
