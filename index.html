@@ -4574,20 +4574,46 @@ function openReceipt(){
   openOverlay('receiptOverlay');
 }
 /* ---------- 导出 / 导入 ---------- */
-function escapeCsv(v){
-  const s = String(v == null ? '' : v);
-  return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s;
+function excelDisplayWidth(value){
+  const text = String(value == null ? '' : value);
+  return text.split(/\r?\n/).reduce(function(maxWidth, line){
+    let width = 0;
+    for(const ch of line){
+      const code = ch.codePointAt(0);
+      const wide = code >= 0x1100 && (
+        code <= 0x115f ||
+        code === 0x2329 || code === 0x232a ||
+        (code >= 0x2e80 && code <= 0xa4cf && code !== 0x303f) ||
+        (code >= 0xac00 && code <= 0xd7a3) ||
+        (code >= 0xf900 && code <= 0xfaff) ||
+        (code >= 0xfe10 && code <= 0xfe19) ||
+        (code >= 0xfe30 && code <= 0xfe6f) ||
+        (code >= 0xff00 && code <= 0xff60) ||
+        (code >= 0xffe0 && code <= 0xffe6) ||
+        (code >= 0x1f300 && code <= 0x1faff)
+      );
+      width += wide ? 2 : 1;
+    }
+    return Math.max(maxWidth, width);
+  }, 0);
+}
+function excelColumnWidth(header, values, minWidth, maxWidth){
+  let widest = excelDisplayWidth(header);
+  values.forEach(function(value){
+    widest = Math.max(widest, excelDisplayWidth(value));
+  });
+  return Math.max(minWidth, Math.min(maxWidth, Math.ceil(widest * 8.2 + 24)));
 }
 function exportCSV(){
-  const sorted = records.slice().sort(function(a,b){
-    return b.date.localeCompare(a.date) || String(b.createdAt).localeCompare(String(a.createdAt));
+  const sorted = records.filter(function(r){ return !r.deleted; }).sort(function(a,b){
+    return a.date.localeCompare(b.date) || String(a.createdAt).localeCompare(String(b.createdAt));
   });
   const hasDonor = sorted.some(function(r){ return String(r.donor || '').trim() !== ''; });
   const header = ['日期','类型','类别'];
   if(hasDonor) header.push('捐款人/捐赠人');
-  header.push('金额','备注','是否已删除');
-  const lines = [header.map(escapeCsv).join(',')];
-  for(const r of sorted){
+  header.push('金额','备注');
+
+  const rows = sorted.map(function(r){
     const signed = r.type === 'income' ? r.amount : -r.amount;
     const row = [
       r.date,
@@ -4595,11 +4621,60 @@ function exportCSV(){
       r.category
     ];
     if(hasDonor) row.push(r.donor || '');
-    row.push(signed.toFixed(2), r.note, r.deleted ? '是' : '否');
-    lines.push(row.map(escapeCsv).join(','));
-  }
-  const blob = new Blob(['\ufeff' + lines.join('\r\n')], {type:'text/csv;charset=utf-8;'});
-  downloadBlob(blob, 'Xaiu猫猫守护团备份_' + todayStr() + '.csv');
+    row.push(signed.toFixed(2), r.note || '');
+    return row;
+  });
+
+  const widths = header.map(function(label, columnIndex){
+    const values = rows.map(function(row){ return row[columnIndex]; });
+    if(label === '日期') return excelColumnWidth(label, values, 96, 132);
+    if(label === '类型') return excelColumnWidth(label, values, 74, 96);
+    if(label === '金额') return excelColumnWidth(label, values, 96, 140);
+    if(label === '备注') return excelColumnWidth(label, values, 150, 420);
+    return excelColumnWidth(label, values, 105, 260);
+  });
+  const cellClass = function(label){
+    if(label === '日期') return ' date-cell';
+    if(label === '金额') return ' amount-cell';
+    if(label === '备注') return ' note-cell';
+    return '';
+  };
+  const table = [
+    '<!DOCTYPE html>',
+    '<html xmlns:x="urn:schemas-microsoft-com:office:excel">',
+    '<head>',
+    '<meta charset="UTF-8">',
+    '<!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet>',
+    '<x:Name>收支明细</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions>',
+    '</x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->',
+    '<style>',
+    '@page{margin:12px;}',
+    'table{border-collapse:collapse;table-layout:auto;font-family:"Microsoft YaHei","微软雅黑",Arial,sans-serif;font-size:11pt;color:#3E2A1E;}',
+    'th,td{border:1px solid #D9C7B6;padding:7px 9px;vertical-align:middle;}',
+    'th{background:#FFE1C7;color:#5C3317;font-weight:700;text-align:center;white-space:nowrap;}',
+    'tr:nth-child(even) td{background:#FFF8F1;}',
+    '.date-cell,.amount-cell{white-space:nowrap;}',
+    '.amount-cell{text-align:right;mso-number-format:"0\\.00";}',
+    '.note-cell{white-space:normal;line-height:1.45;}',
+    '</style>',
+    '</head>',
+    '<body>',
+    '<table>',
+    '<colgroup>' + widths.map(function(width){ return '<col style="width:' + width + 'px">'; }).join('') + '</colgroup>',
+    '<thead><tr>' + header.map(function(label){
+      return '<th class="' + cellClass(label).trim() + '">' + escapeHtml(label) + '</th>';
+    }).join('') + '</tr></thead>',
+    '<tbody>' + rows.map(function(row){
+      return '<tr>' + row.map(function(value, columnIndex){
+        return '<td class="' + cellClass(header[columnIndex]).trim() + '">' + escapeHtml(value) + '</td>';
+      }).join('') + '</tr>';
+    }).join('') + '</tbody>',
+    '</table>',
+    '</body>',
+    '</html>'
+  ].join('\r\n');
+  const blob = new Blob(['\ufeff' + table], {type:'application/vnd.ms-excel;charset=utf-8;'});
+  downloadBlob(blob, 'Xaiu猫猫守护团收支明细_' + todayStr() + '.xls');
 }
 function exportJSON(){
   const payload = {
