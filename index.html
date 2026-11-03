@@ -4690,6 +4690,11 @@ function exportCSV(){
   closingRow[incomeIndex] = normalIncome.toFixed(2);
   closingRow[expenseIndex] = (-normalExpense).toFixed(2);
   closingRow[balanceIndex] = normalBalance.toFixed(2);
+  const materialHeaderRow = new Array(columns.length).fill('');
+  materialHeaderRow[0] = '日期';
+  materialHeaderRow[1] = '备注';
+  if(hasDonor) materialHeaderRow[2] = '捐赠人';
+  materialHeaderRow[incomeIndex] = '物资捐赠';
   const excelColumnLetter = function(index){ return String.fromCharCode(65 + index); };
   const incomeLetter = excelColumnLetter(incomeIndex);
   const expenseLetter = excelColumnLetter(expenseIndex);
@@ -4760,6 +4765,7 @@ function exportCSV(){
     })(), true),
     materialRows.length ? renderRow(new Array(columns.length).fill('')) : '',
     materialRows.length ? renderRow(new Array(columns.length).fill('')) : '',
+    materialRows.length ? renderRow(materialHeaderRow) : '',
     materialRows.map(function(row){
       return renderRow(row, null, false, incomeIndex);
     }).join(''),
