@@ -208,7 +208,7 @@ button{font-family:inherit;}
   border-color:#FF948D!important;
 }
 
-/* 预算 */
+/* 上月结余 */
 .budget-card{padding:18px 20px 16px;}
 .budget-head{
   display:flex;
@@ -223,7 +223,7 @@ button{font-family:inherit;}
   gap:8px;
 }
 .budget-input-group label{font-size:13px;color:var(--muted);white-space:nowrap;}
-#budgetInput{width:110px;text-align:right;}
+#budgetInput{width:140px;text-align:right;}
 .budget-stats{
   display:flex;
   gap:18px;
@@ -233,32 +233,7 @@ button{font-family:inherit;}
   margin:13px 0 8px;
 }
 .budget-stats b{font-size:16px;}
-.budget-stats .over{color:var(--red);}
-.budget-percent{
-  margin-left:auto;
-  font-weight:700;
-  color:var(--orange-deep);
-}
-.progress{
-  height:13px;
-  background:#F2E2CE;
-  border-radius:999px;
-  overflow:hidden;
-}
-.progress-bar{
-  height:100%;
-  width:0%;
-  border-radius:999px;
-  background:linear-gradient(90deg,#FFC38B,#FF8C42);
-  transition:width .45s ease,background .3s;
-}
-.budget-card.warn .progress-bar{background:linear-gradient(90deg,#FFC38B,#FF8C42);}
-.budget-card.danger .progress-bar{background:linear-gradient(90deg,#FF9B8E,#E5484D);}
-.budget-card.warn{background:#FFF5E8;}
-.budget-card.danger{background:#FFF0EC;}
-.budget-tip{margin:10px 0 0;font-size:13px;min-height:20px;}
-.budget-card.warn .budget-tip{color:#C25E14;font-weight:600;}
-.budget-card.danger .budget-tip{color:#C62B30;font-weight:700;}
+.budget-tip{margin:10px 0 0;font-size:13px;color:var(--muted);min-height:20px;}
 
 /* 猫咪档案统计 + 月底预测 */
 .panels-grid{
@@ -1033,32 +1008,24 @@ footer{
     </div>
   </section>
 
-  <!-- 本月预算未设置时的提示 -->
-  <section class="card hidden" id="budgetEmptyCard" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
-    <div>
-      <h2 style="margin:0;">🎯 本月预算未设置</h2>
-      <p class="card-sub" style="margin:4px 0 0;">可留空不填；填写后会显示预算进度与超支预警</p>
-    </div>
-    <button type="button" class="btn secondary small admin-only hidden" id="enableBudgetBtn">设置预算</button>
-  </section>
-
-  <!-- 本月预算 -->
+  <!-- 上月结余 -->
   <section class="card budget-card" id="budgetPanel">
     <div class="budget-head">
-      <h2>🎯 本月预算</h2>
+      <div>
+        <h2>📘 上月结余</h2>
+        <p class="card-sub" style="margin:6px 0 0;">请填写上个月结转至本月的剩余资金。当前结余会自动按“上月结余 + 总收入 - 总支出”计算。</p>
+      </div>
       <div class="budget-input-group">
-        <label for="budgetInput">预算（元）</label>
-        <input type="number" id="budgetInput" min="1" step="1" value="">
-        <button type="button" class="btn primary small" id="budgetSaveBtn">保存</button>
+        <label for="budgetInput">上月剩余资金（元）</label>
+        <input type="number" id="budgetInput" min="0" step="0.01" value="" placeholder="如：405.00" readonly>
+        <button type="button" class="btn primary small admin-only hidden" id="budgetSaveBtn">保存</button>
       </div>
     </div>
     <div class="budget-stats">
-      <span>已用：<b id="budgetUsed">¥0.00</b></span>
-      <span>剩余：<b id="budgetRemain">¥500.00</b></span>
-      <span class="budget-percent" id="budgetPercent">0%</span>
-    </div>
-    <div class="progress" role="progressbar" aria-label="预算使用进度">
-      <div class="progress-bar" id="budgetProgress"></div>
+      <span>上月结余：<b id="openingBalanceValue">¥0.00</b></span>
+      <span>本月收入：<b id="monthIncomeValue">¥0.00</b></span>
+      <span>本月支出：<b id="monthExpenseValue">¥0.00</b></span>
+      <span>当前结余：<b id="currentBalanceValue">¥0.00</b></span>
     </div>
     <p class="budget-tip" id="budgetTip"></p>
   </section>
@@ -1081,7 +1048,7 @@ footer{
     </div>
     <div class="card">
       <h2>📊 本月概况</h2>
-      <p class="card-sub">本月支出、预算剩余与剩余天数一览</p>
+      <p class="card-sub">上月结余、本月收支与当前结余一览</p>
       <div class="forecast-body" id="forecastBody"></div>
     </div>
   </section>
@@ -1866,7 +1833,7 @@ const CLOUD_CONFIG_DIRTY_KEY = 'catCloudConfigDirtyV1';
 const INV_MUTATION_KEY = 'catInventoryMutationV1';
 const CLOUD_CFG_ID = 'main';
 const DEFAULT_PASSWORD = 'cat2026';
-const CATEGORIES = ['猫粮','罐头','绝育','医疗','义卖','捐款','捐赠','物资采购','其他'];
+const CATEGORIES = ['猫粮','罐头','绝育','医疗','义卖','捐款','捐赠','成员群收款','新成员入群','物资采购','其他'];
 
 const $ = (id) => document.getElementById(id);
 let records = loadRecords();
@@ -1874,7 +1841,6 @@ let cats = loadCats();
 let adminLoggedIn = false;
 let currentAdminName = '';
 let selectedIds = new Set();
-let budgetAlertShown = false;
 let pieChart = null;
 let lineChart = null;
 let catDraft = null;
@@ -2155,22 +2121,22 @@ function removeAdminAccount(name){
   });
   saveAdminAccounts(next);
 }
-function getBudget(){
+function getOpeningBalance(){
   if(cloudConfigCache && Object.prototype.hasOwnProperty.call(cloudConfigCache, 'budget')){
     const cached = Number(cloudConfigCache.budget);
-    return (isFinite(cached) && cached > 0) ? cached : null;
+    return (cloudConfigCache.budget !== null && cloudConfigCache.budget !== '' && isFinite(cached) && cached >= 0) ? cached : null;
   }
   const raw = readLS(BUDGET_KEY);
   if(raw === null || raw === '') return null;
   const val = parseFloat(readLS(BUDGET_KEY));
-  return (isFinite(val) && val > 0) ? val : null;
+  return (isFinite(val) && val >= 0) ? val : null;
 }
-function setBudgetValue(text){
+function setOpeningBalanceValue(text){
   const rawText = text === null || text === undefined ? '' : String(text);
   writeLS(BUDGET_KEY, rawText);
   if(cloudConfigCache){
     const num = parseFloat(rawText);
-    cloudConfigCache.budget = (rawText !== '' && isFinite(num) && num > 0) ? Math.round(num * 100) / 100 : null;
+    cloudConfigCache.budget = (rawText !== '' && isFinite(num) && num >= 0) ? Math.round(num * 100) / 100 : null;
     cloudConfigCache.updatedAt = new Date().toISOString();
     saveCloudConfigCache(cloudConfigCache);
     markCloudConfigDirty();
@@ -2317,26 +2283,31 @@ function findRecord(id){
 function calcStats(){
   let totalIncome = 0;
   let totalExpense = 0;
+  let monthIncome = 0;
   let monthExpense = 0;
   const mKey = currentMonthKey();
   for(const r of records){
     if(r.deleted) continue;
     if(r.type === 'income'){
       totalIncome += r.amount;
+      if(monthKeyOf(r.date) === mKey) monthIncome += r.amount;
     }else{
       totalExpense += r.amount;
       if(monthKeyOf(r.date) === mKey) monthExpense += r.amount;
     }
   }
+  const openingBalance = getOpeningBalance() || 0;
   return {
     totalIncome: Math.round(totalIncome*100)/100,
     totalExpense: Math.round(totalExpense*100)/100,
-    balance: Math.round((totalIncome - totalExpense)*100)/100,
+    monthIncome: Math.round(monthIncome*100)/100,
+    openingBalance: Math.round(openingBalance*100)/100,
+    balance: Math.round((openingBalance + totalIncome - totalExpense)*100)/100,
     monthExpense: Math.round(monthExpense*100)/100
   };
 }
 
-/* ---------- 统计与预算 ---------- */
+/* ---------- 统计与上月结余 ---------- */
 function renderStats(){
   const st = calcStats();
   $('totalIncome').textContent = formatMoney(st.totalIncome);
@@ -2346,62 +2317,18 @@ function renderStats(){
   $('totalBalance').style.color = st.balance < 0 ? 'var(--red)' : '';
 }
 
-function renderBudget(notify){
+function renderOpeningBalance(){
   const st = calcStats();
-  const used = st.monthExpense;
-  const budget = getBudget();
-  const panel = $('budgetPanel');
-  const monthCard = $('monthExpenseCard');
-  if(budget === null){
-    panel.classList.add('hidden');
-    $('budgetEmptyCard').classList.remove('hidden');
-    monthCard.classList.remove('warn','danger');
-    $('budgetProgress').style.width = '0%';
-    return;
-  }
-  panel.classList.remove('hidden');
-  $('budgetEmptyCard').classList.add('hidden');
-  const over = Math.round((used - budget)*100)/100;
-  const pct = budget > 0 ? used/budget*100 : (used > 0 ? 200 : 0);
-  const clampedPct = Math.min(pct, 100);
-
-  $('budgetUsed').textContent = formatMoney(used);
-  $('budgetRemain').textContent = over > 0 ? '已超支 ' + formatMoney(Math.abs(over)) : formatMoney(budget - used);
-  $('budgetRemain').className = over > 0 ? 'over' : '';
-  $('budgetPercent').textContent = (pct >= 100 ? Math.floor(pct) : pct.toFixed(1)) + '%';
-  $('budgetProgress').style.width = clampedPct + '%';
-
-  panel.classList.remove('warn','danger');
-  monthCard.classList.remove('warn','danger');
-
-  if(over > 0){
-    panel.classList.add('danger');
-    monthCard.classList.add('card-danger');
-    $('budgetTip').textContent = '⚠️ 本月支出已超预算 ' + formatMoney(Math.abs(over)) + '，请留意开支！';
-  }else if(pct >= 80){
-    panel.classList.add('warn');
-    monthCard.classList.add('card-warn');
-    $('budgetTip').textContent = pct >= 100
-      ? '本月预算刚好用完，暂无超支，请继续留意后续支出。'
-      : '⚠️ 本月预算已使用 ' + pct.toFixed(0) + '%，接近上限，请注意控制支出。';
-  }else{
-    $('budgetTip').textContent = used > 0
-      ? '本月预算已使用 ' + pct.toFixed(1) + '%，目前还有 ' + formatMoney(budget - used) + ' 可用。'
-      : '本月还没有支出，预算充足，可以安心采购啦。';
-  }
-
-  if(notify && over > 0 && !budgetAlertShown){
-    budgetAlertShown = true;
-    setTimeout(function(){
-      alert('⚠️ 本月支出已超过预算！\n\n已支出：' + formatMoney(used) +
-        '\n本月预算：' + formatMoney(budget) +
-        '\n超出：' + formatMoney(Math.abs(over)) +
-        '\n\n建议调整后续开支安排。');
-    }, 60);
-  }
-  if(over <= 0){
-    budgetAlertShown = false;
-  }
+  const saved = getOpeningBalance();
+  $('budgetInput').value = saved === null ? '' : saved;
+  $('openingBalanceValue').textContent = formatMoney(st.openingBalance);
+  $('monthIncomeValue').textContent = formatMoney(st.monthIncome);
+  $('monthExpenseValue').textContent = formatMoney(st.monthExpense);
+  $('currentBalanceValue').textContent = formatMoney(st.balance);
+  $('currentBalanceValue').style.color = st.balance < 0 ? 'var(--red)' : '';
+  $('budgetTip').textContent = saved === null
+    ? '请填写上月剩余资金；未填写时暂按 ¥0.00 计算。'
+    : '当前结余 = 上月结余 ' + formatMoney(st.openingBalance) + ' + 总收入 ' + formatMoney(st.totalIncome) + ' - 总支出 ' + formatMoney(st.totalExpense) + '。';
 }
 
 function renderCatSummary(){
@@ -2726,8 +2653,7 @@ function deleteCatDraft(){
 
 function renderForecast(){
   const st = calcStats();
-  const used = st.monthExpense;
-  const budget = getBudget();
+  const openingBalance = getOpeningBalance();
   const now = new Date();
   const y = now.getFullYear();
   const m = now.getMonth();
@@ -2735,19 +2661,14 @@ function renderForecast(){
   const dayOfMonth = now.getDate();
   const remaining = Math.max(totalDays - dayOfMonth, 0);
 
-  let rows = '<div class="forecast-row"><span>本月已支出</span><b>' + formatMoney(used) + '</b></div>';
-  let msg = '';
-  if(budget === null){
-    rows += '<div class="forecast-row"><span>本月预算</span><b>未填写</b></div>';
-    msg = '<p class="forecast-msg ok">填写预算后会在这里显示预算剩余。</p>';
-  }else{
-    const remain = Math.round((budget - used) * 100) / 100;
-    rows += '<div class="forecast-row"><span>' + (remain < 0 ? '本月超支' : '预算剩余') + '</span><b style="color:' + (remain < 0 ? '#B72E33' : 'inherit') + ';">' + (remain < 0 ? formatMoney(Math.abs(remain)) : formatMoney(remain)) + '</b></div>';
-    msg = remain < 0
-      ? '<p class="forecast-msg danger">⚠️ 本月支出已超预算 ' + formatMoney(Math.abs(remain)) + '，请留意开支！</p>'
-      : '<p class="forecast-msg ok">本月预算还有 ' + formatMoney(remain) + ' 余量，继续加油。</p>';
-  }
+  let rows = '<div class="forecast-row"><span>上月结余</span><b>' + (openingBalance === null ? '未填写' : formatMoney(st.openingBalance)) + '</b></div>';
+  rows += '<div class="forecast-row"><span>本月收入</span><b>' + formatMoney(st.monthIncome) + '</b></div>';
+  rows += '<div class="forecast-row"><span>本月支出</span><b>' + formatMoney(st.monthExpense) + '</b></div>';
+  rows += '<div class="forecast-row"><span>当前结余</span><b style="color:' + (st.balance < 0 ? '#B72E33' : 'inherit') + ';">' + formatMoney(st.balance) + '</b></div>';
   rows += '<div class="forecast-row"><span>距月底还有</span><b>' + remaining + ' 天</b></div>';
+  const msg = openingBalance === null
+    ? '<p class="forecast-msg ok">请先填写上月剩余资金，当前结余暂按 ¥0.00 起算。</p>'
+    : '<p class="forecast-msg ok">当前结余已包含上月结余。</p>';
   $('forecastBody').innerHTML = rows + msg;
 }
 
@@ -2986,7 +2907,7 @@ async function cloudStart(){
     supPausedSuspect = false;
     cloudRetryDelay = 15000;
     await cloudBootstrap();
-    setCloudBar('online', '☁️ 已连接 Supabase：收支、猫咪、预算、管理员账号会在所有设备间自动同步');
+    setCloudBar('online', '☁️ 已连接 Supabase：收支、猫咪、上月结余、管理员账号会在所有设备间自动同步');
     scheduleCloudPoll();
   }catch(e){
     console.error('Supabase 连接失败：', e);
@@ -3398,7 +3319,7 @@ function cloudAdoptConfig(cfg, firstSeed, snapshotEpoch){
   const admins = normalizeCloudAdmins(effective.admins);
   const rawBudget = Object.prototype.hasOwnProperty.call(effective, 'budget') ? effective.budget : null;
   const budgetNum = rawBudget === null || rawBudget === '' ? null : Number(rawBudget);
-  const budget = (isFinite(budgetNum) && budgetNum > 0) ? Math.round(budgetNum * 100) / 100 : null;
+  const budget = (isFinite(budgetNum) && budgetNum >= 0) ? Math.round(budgetNum * 100) / 100 : null;
   const updatedAt = String(effective.updatedAt || new Date().toISOString());
   // 库存与流水总是载入（保底，避免某些设备/手机上不显示明细）
   const publicInvSource = Array.isArray(effective.publicInv) && effective.publicInv.length
@@ -4119,7 +4040,7 @@ function addDonationRecord(itemName, donor, note, pool, logId){
 }
 function buildCloudConfigObject(){
   return {
-    budget: getBudget(),
+    budget: getOpeningBalance(),
     admins: getAdminAccounts().map(function(a){
       return {name: String(a.name || ''), password: String(a.password || ''), createdAt: String(a.createdAt || '')};
     }),
@@ -4188,7 +4109,7 @@ function updateRecycleButtonCount(){
 }
 
 const EXPENSE_CATS = ['猫粮','罐头','绝育','医疗','物资采购','其他'];
-const INCOME_CATS = ['捐款','捐赠','其他'];
+const INCOME_CATS = ['捐款','捐赠','成员群收款','新成员入群','其他'];
 function rebuildCategoryOptions(){
   const sel = $('categorySelect');
   const type = $('typeSelect').value;
@@ -4609,38 +4530,59 @@ function exportCSV(){
     return a.date.localeCompare(b.date) || String(a.createdAt).localeCompare(String(b.createdAt));
   });
   const hasDonor = sorted.some(function(r){ return String(r.donor || '').trim() !== ''; });
-  const columns = ['日期','收入','支出','类别'];
+  const columns = ['日期','类别'];
   if(hasDonor) columns.push('捐款人/捐赠人');
-  columns.push('金额','备注');
+  columns.push('类型','金额','结余','备注');
 
   const rows = sorted.map(function(r){
     const signed = r.type === 'income' ? r.amount : -r.amount;
-    const row = [
-      r.date,
-      r.type === 'income' ? '收入' : '',
-      r.type === 'expense' ? '支出' : '',
-      r.category
-    ];
+    const row = [r.date, r.category];
     if(hasDonor) row.push(r.donor || '');
-    row.push(signed.toFixed(2), r.note || '');
+    row.push(r.type === 'income' ? '收入' : '支出', signed.toFixed(2), '', r.note || '');
     return row;
   });
 
   const widths = columns.map(function(label, columnIndex){
     const values = rows.map(function(row){ return row[columnIndex]; });
     if(label === '日期') return excelColumnWidth(label, values, 96, 160);
-    if(label === '收入' || label === '支出') return excelColumnWidth(label, values, 62, 86);
-    if(label === '金额') return excelColumnWidth(label, values, 96, 170);
+    if(label === '类型') return excelColumnWidth(label, values, 74, 92);
+    if(label === '金额' || label === '结余') return excelColumnWidth(label, values, 96, 170);
     if(label === '备注') return excelColumnWidth(label, values, 150, 1800);
-    return excelColumnWidth(label, values, 105, 900);
+    if(label === '捐款人/捐赠人') return excelColumnWidth(label, values, 120, 900);
+    return excelColumnWidth(label, values, 105, 700);
   });
-  const headerCells = [
-    '<td>日期</td>',
-    '<td colspan="2">类型</td>',
-    '<td>类别</td>'
-  ];
-  if(hasDonor) headerCells.push('<td>捐款人/捐赠人</td>');
-  headerCells.push('<td>金额</td>', '<td>备注</td>');
+  const headerCells = columns.map(function(label){
+    return '<td>' + escapeHtml(label) + '</td>';
+  });
+  const st = calcStats();
+  const typeIndex = hasDonor ? 3 : 2;
+  const amountIndex = hasDonor ? 4 : 3;
+  const balanceIndex = hasDonor ? 5 : 4;
+  const openingRow = new Array(columns.length).fill('');
+  openingRow[0] = '上月结余';
+  openingRow[balanceIndex] = st.openingBalance.toFixed(2);
+  const closingRow = new Array(columns.length).fill('');
+  closingRow[0] = '本月结余';
+  closingRow[balanceIndex] = st.balance.toFixed(2);
+  const excelColumnLetter = function(index){ return String.fromCharCode(65 + index); };
+  const typeLetter = excelColumnLetter(typeIndex);
+  const amountLetter = excelColumnLetter(amountIndex);
+  const balanceLetter = excelColumnLetter(balanceIndex);
+  const firstDataExcelRow = 3;
+  const lastDataExcelRow = 2 + sorted.length;
+  const balanceFormula = '=ROUND(' + balanceLetter + '2' +
+    '+SUMIF(' + typeLetter + firstDataExcelRow + ':' + typeLetter + lastDataExcelRow + ',"收入",' +
+    amountLetter + firstDataExcelRow + ':' + amountLetter + lastDataExcelRow + ')' +
+    '-ABS(SUMIF(' + typeLetter + firstDataExcelRow + ':' + typeLetter + lastDataExcelRow + ',"支出",' +
+    amountLetter + firstDataExcelRow + ':' + amountLetter + lastDataExcelRow + ')),2)';
+  const renderRow = function(row, formula){
+    return '<tr>' + row.map(function(value, index){
+      if(formula && index === balanceIndex){
+        return '<td x:fmla="' + escapeHtml(formula) + '">' + escapeHtml(value) + '</td>';
+      }
+      return '<td>' + escapeHtml(value) + '</td>';
+    }).join('') + '</tr>';
+  };
   const table = [
     '<!DOCTYPE html>',
     '<html xmlns:x="urn:schemas-microsoft-com:office:excel">',
@@ -4651,18 +4593,16 @@ function exportCSV(){
     '</x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->',
     '<style>',
     'table{border-collapse:collapse;table-layout:auto;}',
-    'td{border:none;padding:0;font-weight:normal;white-space:nowrap;mso-wrap-text:no;}',
+    'td{border:none;padding:0;font-weight:normal;white-space:nowrap;mso-wrap-text:no;text-align:center;}',
     '</style>',
     '</head>',
     '<body>',
     '<table>',
     '<colgroup>' + widths.map(function(width){ return '<col width="' + width + '" style="width:' + width + 'px">'; }).join('') + '</colgroup>',
     '<tr>' + headerCells.join('') + '</tr>',
-    rows.map(function(row){
-      return '<tr>' + row.map(function(value){
-        return '<td>' + escapeHtml(value) + '</td>';
-      }).join('') + '</tr>';
-    }).join(''),
+    renderRow(openingRow),
+    rows.map(function(row){ return renderRow(row); }).join(''),
+    renderRow(closingRow, balanceFormula),
     '</table>',
     '</body>',
     '</html>'
@@ -4786,6 +4726,7 @@ function setAdminUI(on){
   adminLoggedIn = on;
   $('adminSwitch').checked = on;
   $('adminModeText').textContent = on ? '管理员模式（已开启）' : '管理员模式';
+  $('budgetInput').readOnly = !on;
   if(on){
     $('entrySection').classList.remove('hidden');
   }else{
@@ -4968,9 +4909,9 @@ function submitRemoveAdmin(name){
 }
 
 /* ---------- 渲染汇总 ---------- */
-function renderAll(notifyBudget){
+function renderAll(){
   renderStats();
-  renderBudget(!!notifyBudget);
+  renderOpeningBalance();
   renderCatSummary();
   renderCats();
   renderForecast();
@@ -5034,28 +4975,22 @@ function bindEvents(){
   $('pwdConfirmBtn').addEventListener('click', attemptPwdChange);
   $('currentPwd').addEventListener('input', function(){ $('pwdError').textContent = ''; });
 
-  $('enableBudgetBtn').addEventListener('click', function(){
-    $('budgetEmptyCard').classList.add('hidden');
-    $('budgetPanel').classList.remove('hidden');
-    $('budgetInput').value = '';
-    $('budgetInput').focus();
-  });
   $('budgetSaveBtn').addEventListener('click', function(){
     const rawValue = $('budgetInput').value.trim();
     if(rawValue === ''){
-      setBudgetValue('');
+      setOpeningBalanceValue('');
       renderAll(false);
-      showToast('已清除本月预算（不填即隐藏）');
+      showToast('已清除上月结余，当前按 ¥0.00 计算');
       return;
     }
     const val = parseFloat(rawValue);
-    if(!isFinite(val) || val <= 0){
-      alert('请输入大于 0 的预算金额');
+    if(!isFinite(val) || val < 0){
+      alert('请输入不小于 0 的上月结余金额');
       return;
     }
-    setBudgetValue(String(Math.round(val*100)/100));
-    renderAll(true);
-    showToast('本月预算已更新为 ' + formatMoney(val));
+    setOpeningBalanceValue(String(Math.round(val*100)/100));
+    renderAll();
+    showToast('上月结余已更新为 ' + formatMoney(val));
   });
   $('budgetInput').addEventListener('keydown', function(e){
     if(e.key === 'Enter'){ e.preventDefault(); $('budgetSaveBtn').click(); }
@@ -5306,8 +5241,8 @@ function bindEvents(){
 /* ---------- 初始化 ---------- */
 function init(){
   $('recordDate').value = todayStr();
-  const budget = getBudget();
-  $('budgetInput').value = budget === null ? '' : budget;
+  const openingBalance = getOpeningBalance();
+  $('budgetInput').value = openingBalance === null ? '' : openingBalance;
   bindEvents();
   const sessionName = readSS(ADMIN_SESSION_KEY);
   let sessionOn = false;
